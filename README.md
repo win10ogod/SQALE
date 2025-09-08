@@ -1,4 +1,6 @@
-SQALE — A small, statically typed, homoiconic, bracket‑Lisp with LLVM
+# SQALE — statically typed, homoiconic, bracket‑Lisp with LLVM
+
+Repository: https://github.com/win10ogod/SQALE
 
 Overview
 
@@ -84,6 +86,9 @@ Optional (LLVM backend):
 Commands
 
 ```
+git clone https://github.com/win10ogod/SQALE.git
+cd SQALE
+cd sqale
 make                 # build interpreter into build/sqale
 make USE_LLVM=1      # build with LLVM enabled
 ./build/sqale repl   # REPL
@@ -126,12 +131,12 @@ sqale/
 
 Documentation Quick Links
 
-- Repository Guidelines: ../AGENTS.md
-- Contributing Guide: ../CONTRIBUTING.md
-- Code of Conduct: ../CODE_OF_CONDUCT.md
-- Roadmap: ../ROADMAP.md
-- Design Notes: docs/DESIGN.md
-- PR Template: ../.github/PULL_REQUEST_TEMPLATE.md
+- Repository Guidelines: https://github.com/win10ogod/SQALE/blob/main/AGENTS.md
+- Contributing Guide: https://github.com/win10ogod/SQALE/blob/main/CONTRIBUTING.md
+- Code of Conduct: https://github.com/win10ogod/SQALE/blob/main/CODE_OF_CONDUCT.md
+- Roadmap: https://github.com/win10ogod/SQALE/blob/main/ROADMAP.md
+- Design Notes: https://github.com/win10ogod/SQALE/blob/main/sqale/docs/DESIGN.md
+- PR Template: https://github.com/win10ogod/SQALE/blob/main/.github/PULL_REQUEST_TEMPLATE.md
 
 Contributing
 
