@@ -1,0 +1,4 @@
+[def main : [ -> Int]
+  [fn [] : Int
+    [print "Hello, SQALE!"]
+    0]]

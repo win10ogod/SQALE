@@ -1,0 +1,5 @@
+[let [[v : [Vec Any] [vec 1 3 2 5 4]]]
+  [print v]
+  [vec-push v 9]
+  [print [vec-get v 2]]
+  [print [vec-len v]]]

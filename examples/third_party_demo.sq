@@ -1,0 +1,6 @@
+[import "packages/official/hello.sq"]
+
+[def main : [ -> Int]
+  [fn [] : Int
+    [hello]
+    0]]

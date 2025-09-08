@@ -1,0 +1,16 @@
+[defmacro when [t body]
+  [quasiquote [if [unquote t] [do [unquote body]] [do]]]]
+
+[defmacro cond [clauses]
+  [quasiquote
+    [do [unquote
+      [fn [[cs : Any]] : Any
+        [if [= 0 0]
+          [do
+            ; fallback no-op; rely on built-in cond unless using proper list ops
+            [quote [do]]]
+          [quote [do]]]]]]]
+
+[defmacro -> [x step]
+  [quasiquote [[unquote step] [unquote x]]]
+

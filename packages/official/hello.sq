@@ -1,0 +1,4 @@
+[def hello : [ -> Unit]
+  [fn [] : Unit
+    [print "Hello from official package!"]]]
+

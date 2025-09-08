@@ -1,0 +1,3 @@
+[when true [print "macro-when works"]]
+[cond [false [print "A"]] [true [print "B"]]]
+

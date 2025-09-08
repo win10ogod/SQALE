@@ -1,0 +1,10 @@
+[def add : [Int Int -> Int] [fn [[a : Int] [b : Int]] : Int [+ a b]]]
+[def make-adder : [Int -> [Int -> Int]]
+  [fn [[k : Int]] : [Int -> Int]
+    [fn [[x : Int]] : Int [+ x k]]]]
+
+[def main : [ -> Int]
+  [fn [] : Int
+    [let [[plus2 : [Int -> Int] [make-adder 2]]]
+      [print [plus2 40]]
+      0]]]

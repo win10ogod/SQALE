@@ -1,0 +1,5 @@
+[def main : (Unit -> Int)
+  [fn [] : Int
+    [print [+ 1 2]]
+    0]]
+

@@ -1,0 +1,11 @@
+[def worker : [Int [Chan Int] -> Unit]
+  [fn [[n : Int] [out : [Chan Int]]] : Unit
+    [send out [+ n 1]]
+    [print ""]]]
+
+[def main : [ -> Int]
+  [fn [] : Int
+    [let [[c : [Chan Int]] [chan]]
+      [spawn [fn [] : Unit [worker 41 c]]]
+      [print [recv c]]
+      0]]]

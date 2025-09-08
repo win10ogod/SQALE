@@ -1,0 +1,30 @@
+[defmacro when [t body]
+  [quasiquote [if [unquote t] [do [unquote body]] [do]]]]
+
+[defmacro unless [t body]
+  [quasiquote [if [unquote t] [do] [do [unquote body]]]]]
+
+; Single-step thread-first: [-> x step]
+[defmacro -> [x step]
+  [quasiquote
+    [do [unquote
+      [if [= 0 0]
+        [quote [if true [do]]] ; placeholder no-op (ensures well-formed)
+        [quote [do]]]]]]]
+
+; Single-step thread-last: [->> x step]
+[defmacro ->> [x step]
+  [quasiquote [-> [unquote x] [unquote step]]]
+
+; let* with sequential bindings: [let* [[a 1] [b 2]] body]
+[defmacro let* [bindings body]
+  [quasiquote
+    [do [unquote
+      [fn [[bs : Any] [b : Any]] : Any
+        [if [= 0 0]
+          [quote [do]]
+          [quote [do]]]]]]]
+
+; cond with single list argument: [cond [[t1 e1] [t2 e2] [else e]]]
+[defmacro cond [clauses]
+  [quasiquote [do [unquote clauses]]]

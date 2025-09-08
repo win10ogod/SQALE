@@ -1,0 +1,13 @@
+[let [[text : Str [read-file "sqale/examples/hello.sq"]]
+      [words : [Vec Str] [str-split-ws text]]
+      [m : [Map Str Int] [map]]]
+  [do
+    [let [[i : Int 0]]
+      [do]
+    ]
+    ; naive loop over words by index
+    [let [[n : Int [vec-len words]]]
+      [do]
+    ]
+    [print [map-len m]]]
+

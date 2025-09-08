@@ -1,0 +1,4 @@
+[let [[inc : [Int -> Int] [fn [[n : Int]] : Int [+ n 1]]]]
+  [let [[res : Int [let [[a 1]] [let [[b [+ a 1]]] b]]]]
+    [print res]]]
+
