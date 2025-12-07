@@ -4,11 +4,17 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+
+// Cross-platform alloca
+#ifdef _WIN32
+#include <malloc.h>
+#else
 #include <alloca.h>
+#endif
+
 #include <strings.h>
 
 // Forward decls
-static Value eval_node(VM *vm, Env *env, Node *n);
 static int typecheck_node(Env *tenv, Node *n);
 static Type *parse_type_node(Node *n);
 // Macro expansion (applied in main.c before typecheck), but we also support quote at runtime
@@ -141,6 +147,56 @@ static int is_sym(Node *n, const char *s) {
   return n && n->kind==N_SYMBOL && strlen(s)==n->as.sym.len && strncmp(n->as.sym.ptr, s, n->as.sym.len)==0;
 }
 
+// Helper for quasiquote: push value to ValList
+static void qq_vl_push(ValList *vl, Value v) {
+  if (vl->len == vl->cap) {
+    vl->cap = vl->cap ? vl->cap * 2 : 4;
+    vl->items = (Value*)realloc(vl->items, sizeof(Value) * vl->cap);
+  }
+  vl->items[vl->len++] = v;
+}
+
+// Forward decl for qq_eval
+static Value eval_node(VM *vm, Env *env, Node *n);
+
+// Helper for quasiquote: recursively evaluate quasiquoted expressions
+static Value qq_eval(VM *vm, Env *env, Node *node) {
+  if (node->kind == N_LIST) {
+    // Handle unquote at head position
+    if (node->as.list.count >= 2 && node->as.list.items[0]->kind == N_SYMBOL &&
+        is_sym(node->as.list.items[0], "unquote")) {
+      return eval_node(vm, env, node->as.list.items[1]);
+    }
+    ValList *vl = (ValList*)gc_alloc(&vm->gc, sizeof(ValList), 7);
+    vl->len = 0; vl->cap = 0; vl->items = NULL;
+    for (size_t i = 0; i < node->as.list.count; i++) {
+      Node *el = node->as.list.items[i];
+      if (el->kind == N_LIST && el->as.list.count >= 2 &&
+          el->as.list.items[0]->kind == N_SYMBOL &&
+          is_sym(el->as.list.items[0], "unquote-splicing")) {
+        Value sp = eval_node(vm, env, el->as.list.items[1]);
+        if (sp.kind == VAL_LIST && sp.as.list) {
+          for (int k = 0; k < sp.as.list->len; k++)
+            qq_vl_push(vl, sp.as.list->items[k]);
+        } else {
+          qq_vl_push(vl, sp);
+        }
+      } else {
+        qq_vl_push(vl, qq_eval(vm, env, el));
+      }
+    }
+    return v_list(vl);
+  }
+  switch (node->kind) {
+    case N_INT: return v_int(node->as.ival);
+    case N_FLOAT: return v_float(node->as.fval);
+    case N_BOOL: return v_bool(node->as.bval);
+    case N_STRING: return v_str(rt_string_new(vm, node->as.str.ptr, node->as.str.len));
+    case N_SYMBOL: return v_symbol(node->as.sym.ptr, (int32_t)node->as.sym.len);
+    default: return v_symbol("_", 1);
+  }
+}
+
 // no-op now; direct native fns are stored
 
 // Closure call
@@ -195,41 +251,9 @@ static Value eval_list(VM *vm, Env *env, Node *list) {
       // quasiquote with unquote and unquote-splicing
       if (n<2) { list->ty = ty_any(NULL); return v_unit(); }
       Node *q = list->as.list.items[1];
-      // Helpers
-      void vl_push(ValList *vl, Value v){ if (vl->len==vl->cap){ vl->cap=vl->cap?vl->cap*2:4; vl->items=(Value*)realloc(vl->items,sizeof(Value)*vl->cap);} vl->items[vl->len++]=v; }
-      Value qq(Node *node) {
-        if (node->kind==N_LIST) {
-          // Handle unquote and unquote-splicing at head position
-          if (node->as.list.count>=2 && node->as.list.items[0]->kind==N_SYMBOL && is_sym(node->as.list.items[0], "unquote")) {
-            return eval_node(vm, env, node->as.list.items[1]);
-          }
-          ValList *vl = (ValList*)gc_alloc(&vm->gc, sizeof(ValList), 7);
-          vl->len=0; vl->cap=0; vl->items=NULL;
-          for (size_t i=0;i<node->as.list.count;i++) {
-            Node *el = node->as.list.items[i];
-            if (el->kind==N_LIST && el->as.list.count>=2 && el->as.list.items[0]->kind==N_SYMBOL && is_sym(el->as.list.items[0], "unquote-splicing")) {
-              Value sp = eval_node(vm, env, el->as.list.items[1]);
-              if (sp.kind==VAL_LIST && sp.as.list) {
-                for (int k=0;k<sp.as.list->len;k++) vl_push(vl, sp.as.list->items[k]);
-              } else {
-                vl_push(vl, sp);
-              }
-            } else {
-              vl_push(vl, qq(el));
-            }
-          }
-          return v_list(vl);
-        }
-        switch (node->kind) {
-          case N_INT: return v_int(node->as.ival);
-          case N_FLOAT: return v_float(node->as.fval);
-          case N_BOOL: return v_bool(node->as.bval);
-          case N_STRING: return v_str(rt_string_new(vm, node->as.str.ptr, node->as.str.len));
-          case N_SYMBOL: return v_symbol(node->as.sym.ptr, (int32_t)node->as.sym.len);
-          default: return v_symbol("_",1);
-        }
-      }
-      Value out = qq(q); list->ty = ty_any(NULL); return out;
+      Value out = qq_eval(vm, env, q);
+      list->ty = ty_any(NULL);
+      return out;
     }
     if (is_sym(head, "let")) {
       // [let [[name expr] ...] body...]
