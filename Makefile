@@ -14,12 +14,12 @@ LLVM_CONFIG ?= llvm-config
 OS := $(shell uname -s)
 
 ifeq ($(OS),Linux)
-  PLATFORM_LIBS := -lpthread -ldl
+  PLATFORM_LIBS := -lpthread -ldl -lm
 else ifeq ($(OS),Darwin)
-  PLATFORM_LIBS := -lpthread
+  PLATFORM_LIBS := -lpthread -lm
 else
   # Windows (MSYS/MinGW): threads are built-in; no -lpthread
-  PLATFORM_LIBS :=
+  PLATFORM_LIBS := -lm
 endif
 
 SRCS := \

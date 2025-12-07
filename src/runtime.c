@@ -298,6 +298,179 @@ Value rt_str_len(Env *env, Value *args, int nargs) {
   return v_int(args[0].as.str->len);
 }
 
+// ============================================================================
+// Bitwise Operations
+// ============================================================================
+
+Value rt_bit_and(Env *env, Value *args, int nargs) {
+  (void)env; if (nargs!=2) return v_int(0);
+  if (both_int(args[0],args[1])) return v_int(args[0].as.i & args[1].as.i);
+  return v_int(0);
+}
+
+Value rt_bit_or(Env *env, Value *args, int nargs) {
+  (void)env; if (nargs!=2) return v_int(0);
+  if (both_int(args[0],args[1])) return v_int(args[0].as.i | args[1].as.i);
+  return v_int(0);
+}
+
+Value rt_bit_xor(Env *env, Value *args, int nargs) {
+  (void)env; if (nargs!=2) return v_int(0);
+  if (both_int(args[0],args[1])) return v_int(args[0].as.i ^ args[1].as.i);
+  return v_int(0);
+}
+
+Value rt_bit_not(Env *env, Value *args, int nargs) {
+  (void)env; if (nargs!=1) return v_int(0);
+  if (args[0].kind==VAL_INT) return v_int(~args[0].as.i);
+  return v_int(0);
+}
+
+Value rt_shl(Env *env, Value *args, int nargs) {
+  (void)env; if (nargs!=2) return v_int(0);
+  if (both_int(args[0],args[1])) return v_int(args[0].as.i << args[1].as.i);
+  return v_int(0);
+}
+
+Value rt_shr(Env *env, Value *args, int nargs) {
+  (void)env; if (nargs!=2) return v_int(0);
+  if (both_int(args[0],args[1])) return v_int(args[0].as.i >> args[1].as.i);
+  return v_int(0);
+}
+
+// ============================================================================
+// Extended Math Functions
+// ============================================================================
+
+#include <math.h>
+
+Value rt_abs(Env *env, Value *args, int nargs) {
+  (void)env; if (nargs!=1) return v_int(0);
+  if (args[0].kind==VAL_INT) return v_int(args[0].as.i < 0 ? -args[0].as.i : args[0].as.i);
+  if (args[0].kind==VAL_FLOAT) return v_float(fabs(args[0].as.f));
+  return v_int(0);
+}
+
+Value rt_min(Env *env, Value *args, int nargs) {
+  (void)env; if (nargs!=2) return v_int(0);
+  if (both_int(args[0],args[1])) return v_int(args[0].as.i < args[1].as.i ? args[0].as.i : args[1].as.i);
+  if (both_float(args[0],args[1])) return v_float(args[0].as.f < args[1].as.f ? args[0].as.f : args[1].as.f);
+  return v_int(0);
+}
+
+Value rt_max(Env *env, Value *args, int nargs) {
+  (void)env; if (nargs!=2) return v_int(0);
+  if (both_int(args[0],args[1])) return v_int(args[0].as.i > args[1].as.i ? args[0].as.i : args[1].as.i);
+  if (both_float(args[0],args[1])) return v_float(args[0].as.f > args[1].as.f ? args[0].as.f : args[1].as.f);
+  return v_int(0);
+}
+
+Value rt_pow(Env *env, Value *args, int nargs) {
+  (void)env; if (nargs!=2) return v_float(0);
+  double a = args[0].kind==VAL_INT ? (double)args[0].as.i : (args[0].kind==VAL_FLOAT ? args[0].as.f : 0);
+  double b = args[1].kind==VAL_INT ? (double)args[1].as.i : (args[1].kind==VAL_FLOAT ? args[1].as.f : 0);
+  return v_float(pow(a, b));
+}
+
+Value rt_sqrt(Env *env, Value *args, int nargs) {
+  (void)env; if (nargs!=1) return v_float(0);
+  double x = args[0].kind==VAL_INT ? (double)args[0].as.i : (args[0].kind==VAL_FLOAT ? args[0].as.f : 0);
+  return v_float(sqrt(x));
+}
+
+Value rt_floor(Env *env, Value *args, int nargs) {
+  (void)env; if (nargs!=1) return v_float(0);
+  if (args[0].kind==VAL_FLOAT) return v_float(floor(args[0].as.f));
+  if (args[0].kind==VAL_INT) return v_float((double)args[0].as.i);
+  return v_float(0);
+}
+
+Value rt_ceil(Env *env, Value *args, int nargs) {
+  (void)env; if (nargs!=1) return v_float(0);
+  if (args[0].kind==VAL_FLOAT) return v_float(ceil(args[0].as.f));
+  if (args[0].kind==VAL_INT) return v_float((double)args[0].as.i);
+  return v_float(0);
+}
+
+Value rt_round(Env *env, Value *args, int nargs) {
+  (void)env; if (nargs!=1) return v_float(0);
+  if (args[0].kind==VAL_FLOAT) return v_float(round(args[0].as.f));
+  if (args[0].kind==VAL_INT) return v_float((double)args[0].as.i);
+  return v_float(0);
+}
+
+// ============================================================================
+// String Conversion Functions
+// ============================================================================
+
+Value rt_str_to_int(Env *env, Value *args, int nargs) {
+  (void)env; if (nargs!=1 || args[0].kind!=VAL_STR) return v_int(0);
+  char tmp[64];
+  size_t len = (size_t)args[0].as.str->len;
+  if (len >= sizeof(tmp)) len = sizeof(tmp)-1;
+  memcpy(tmp, args[0].as.str->data, len); tmp[len] = '\0';
+  return v_int(atoll(tmp));
+}
+
+Value rt_int_to_str(Env *env, Value *args, int nargs) {
+  VM *vm = (VM*)env->aux;
+  if (nargs!=1 || args[0].kind!=VAL_INT) return v_str(NULL);
+  char buf[32];
+  int n = snprintf(buf, sizeof(buf), "%lld", (long long)args[0].as.i);
+  String *s = rt_string_new(vm, buf, (size_t)n);
+  return v_str(s);
+}
+
+Value rt_str_to_float(Env *env, Value *args, int nargs) {
+  (void)env; if (nargs!=1 || args[0].kind!=VAL_STR) return v_float(0);
+  char tmp[64];
+  size_t len = (size_t)args[0].as.str->len;
+  if (len >= sizeof(tmp)) len = sizeof(tmp)-1;
+  memcpy(tmp, args[0].as.str->data, len); tmp[len] = '\0';
+  return v_float(atof(tmp));
+}
+
+Value rt_float_to_str(Env *env, Value *args, int nargs) {
+  VM *vm = (VM*)env->aux;
+  if (nargs!=1 || args[0].kind!=VAL_FLOAT) return v_str(NULL);
+  char buf[64];
+  int n = snprintf(buf, sizeof(buf), "%g", args[0].as.f);
+  String *s = rt_string_new(vm, buf, (size_t)n);
+  return v_str(s);
+}
+
+// ============================================================================
+// Additional String Operations
+// ============================================================================
+
+Value rt_str_slice(Env *env, Value *args, int nargs) {
+  VM *vm = (VM*)env->aux;
+  if (nargs!=3 || args[0].kind!=VAL_STR || args[1].kind!=VAL_INT || args[2].kind!=VAL_INT)
+    return v_str(NULL);
+  String *s = args[0].as.str;
+  int64_t start = args[1].as.i;
+  int64_t end = args[2].as.i;
+  if (start < 0) start = 0;
+  if (end > s->len) end = s->len;
+  if (start >= end) return v_str(rt_string_new(vm, "", 0));
+  String *result = rt_string_new(vm, s->data + start, (size_t)(end - start));
+  return v_str(result);
+}
+
+Value rt_str_index(Env *env, Value *args, int nargs) {
+  (void)env;
+  if (nargs!=2 || args[0].kind!=VAL_STR || args[1].kind!=VAL_STR) return v_int(-1);
+  String *haystack = args[0].as.str;
+  String *needle = args[1].as.str;
+  if (needle->len == 0) return v_int(0);
+  if (needle->len > haystack->len) return v_int(-1);
+  for (int64_t i = 0; i <= haystack->len - needle->len; i++) {
+    if (memcmp(haystack->data + i, needle->data, (size_t)needle->len) == 0)
+      return v_int(i);
+  }
+  return v_int(-1);
+}
+
 Value rt_chan(Env *env, Value *args, int nargs) {
   (void)env; (void)args; if (nargs!=0) { /* type info not used at runtime here */ }
   Channel *c = rt_channel_new(16);

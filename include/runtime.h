@@ -62,6 +62,32 @@ Value rt_or(Env *env, Value *args, int nargs);
 // String operations
 Value rt_str_concat(Env *env, Value *args, int nargs);
 Value rt_str_len(Env *env, Value *args, int nargs);
+Value rt_str_slice(Env *env, Value *args, int nargs);
+Value rt_str_index(Env *env, Value *args, int nargs);
+
+// Bitwise operations
+Value rt_bit_and(Env *env, Value *args, int nargs);
+Value rt_bit_or(Env *env, Value *args, int nargs);
+Value rt_bit_xor(Env *env, Value *args, int nargs);
+Value rt_bit_not(Env *env, Value *args, int nargs);
+Value rt_shl(Env *env, Value *args, int nargs);
+Value rt_shr(Env *env, Value *args, int nargs);
+
+// Extended math
+Value rt_abs(Env *env, Value *args, int nargs);
+Value rt_min(Env *env, Value *args, int nargs);
+Value rt_max(Env *env, Value *args, int nargs);
+Value rt_pow(Env *env, Value *args, int nargs);
+Value rt_sqrt(Env *env, Value *args, int nargs);
+Value rt_floor(Env *env, Value *args, int nargs);
+Value rt_ceil(Env *env, Value *args, int nargs);
+Value rt_round(Env *env, Value *args, int nargs);
+
+// String conversions
+Value rt_str_to_int(Env *env, Value *args, int nargs);
+Value rt_int_to_str(Env *env, Value *args, int nargs);
+Value rt_str_to_float(Env *env, Value *args, int nargs);
+Value rt_float_to_str(Env *env, Value *args, int nargs);
 
 // Concurrency
 typedef struct Channel Channel;
