@@ -76,4 +76,24 @@ Value rt_map_set(Env *env, Value *args, int nargs);
 Value rt_map_get(Env *env, Value *args, int nargs);
 Value rt_map_len(Env *env, Value *args, int nargs);
 
+// ============================================================================
+// LLVM Runtime Interface
+// These functions are called from LLVM-generated code
+// ============================================================================
+
+// Print functions (no newline, caller adds newline)
+void sq_print_i64(long long v);
+void sq_print_f64(double v);
+void sq_print_bool(int v);
+void sq_print_cstr(const char *s);
+void sq_print_newline(void);
+
+// Memory allocation
+void *sq_alloc(size_t size);
+
+// Closure support
+void *sq_alloc_closure(void *fn, void *env, int arity);
+void *sq_closure_get_fn(void *closure);
+void *sq_closure_get_env(void *closure);
+
 #endif // RUNTIME_H

@@ -61,9 +61,46 @@ Value rt_print(Env *env, Value *args, int nargs) {
   return v_unit();
 }
 
+// ============================================================================
 // LLVM/run-time shims for codegen
-void sq_print_i64(long long v) { printf("%lld\n", v); }
-void sq_print_cstr(const char *s) { if (s) { printf("%s\n", s); } else { printf("\n"); } }
+// These functions are called from LLVM-generated code
+// ============================================================================
+
+void sq_print_i64(long long v) { printf("%lld", v); }
+void sq_print_f64(double v) { printf("%g", v); }
+void sq_print_bool(int v) { printf(v ? "true" : "false"); }
+void sq_print_cstr(const char *s) { if (s) printf("%s", s); }
+void sq_print_newline(void) { printf("\n"); }
+
+// Runtime memory allocation for LLVM codegen
+void *sq_alloc(size_t size) {
+  return calloc(1, size);
+}
+
+// Closure allocation: stores function pointer, environment, and arity
+typedef struct {
+  void *fn;
+  void *env;
+  int arity;
+} SqClosure;
+
+void *sq_alloc_closure(void *fn, void *env, int arity) {
+  SqClosure *c = (SqClosure*)calloc(1, sizeof(SqClosure));
+  c->fn = fn;
+  c->env = env;
+  c->arity = arity;
+  return c;
+}
+
+void *sq_closure_get_fn(void *closure) {
+  if (!closure) return NULL;
+  return ((SqClosure*)closure)->fn;
+}
+
+void *sq_closure_get_env(void *closure) {
+  if (!closure) return NULL;
+  return ((SqClosure*)closure)->env;
+}
 
 static char *read_file_all(const char *path, size_t *out_len) {
   FILE *f = fopen(path, "rb"); if (!f) return NULL;

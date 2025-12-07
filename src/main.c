@@ -80,11 +80,21 @@ static int cmd_emit_ir(const char *path, const char *out_path) {
   MacroEnv *menv = NULL; macros_register_core(&menv);
   VM *mvm = vm_new(); macros_collect_user(&arena, &menv, mvm, prog_raw);
   Node *prog = macro_expand_all(&arena, menv, prog_raw);
+
+  // Run type checking to populate type annotations on AST nodes
+  VM *vm = vm_new();
+  int rc = eval_program(vm, prog);
+  if (rc != 0) {
+    fprintf(stderr, "Type checking failed\n");
+    vm_free(vm); vm_free(mvm); arena_free(&arena); free(buf);
+    return 1;
+  }
+
   CodegenOpts opts = { .module_name = path, .use_llvm = USE_LLVM, .for_exe = 1 };
   size_t out_len=0; char *ir = codegen_emit_ir(prog, &opts, &out_len);
-  FILE *f = fopen(out_path?out_path:"out.ll", "wb"); if (!f) { free(buf); arena_free(&arena); free(ir); return 1; }
+  FILE *f = fopen(out_path?out_path:"out.ll", "wb"); if (!f) { free(buf); arena_free(&arena); free(ir); vm_free(vm); return 1; }
   fwrite(ir,1,out_len,f); fclose(f);
-  free(ir); vm_free(mvm); arena_free(&arena); free(buf); return 0;
+  free(ir); vm_free(vm); vm_free(mvm); arena_free(&arena); free(buf); return 0;
 }
 
 static int cmd_build(const char *path, const char *out_path) {

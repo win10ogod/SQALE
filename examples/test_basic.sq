@@ -1,0 +1,19 @@
+[def add : [Int Int -> Int]
+  [fn [[a : Int] [b : Int]] : Int
+    [+ a b]]]
+
+[def factorial : [Int -> Int]
+  [fn [[n : Int]] : Int
+    [if [< n 2]
+        1
+        [* n [factorial [- n 1]]]]]]
+
+[def main : [ -> Int]
+  [fn [] : Int
+    [print "Testing basic functions:"]
+    [print [add 2 3]]
+    [print [factorial 5]]
+    [if [< 3 5]
+      [print "3 < 5 is true"]
+      [print "3 < 5 is false"]]
+    0]]
