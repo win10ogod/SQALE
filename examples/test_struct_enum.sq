@@ -1,0 +1,62 @@
+; Test Struct and Enum types (Phase 4)
+
+; Define a Point struct
+[defstruct Point [[x : Int] [y : Int]]]
+
+; Define a Color enum
+[defenum Color [Red Green Blue]]
+
+; Test creating structs
+[def test_struct : [ -> Int]
+  [fn [] : Int
+    [print "Testing struct creation:"]
+
+    ; Create a Point using struct-new
+    [let [[p : Any [struct-new "Point" 10 20]]]
+      ; Access fields by index
+      [print [str-concat "Point x = " [int-to-str [struct-get p 0]]]]
+      [print [str-concat "Point y = " [int-to-str [struct-get p 1]]]]
+
+      ; Modify a field
+      [struct-set p 0 30]
+      [print [str-concat "After set, Point x = " [int-to-str [struct-get p 0]]]]]
+    0]]
+
+; Test enum variants
+[def test_enum : [ -> Int]
+  [fn [] : Int
+    [print "Testing enum variants:"]
+
+    ; Enum variants are integer constants
+    [print [str-concat "Red = " [int-to-str Red]]]
+    [print [str-concat "Green = " [int-to-str Green]]]
+    [print [str-concat "Blue = " [int-to-str Blue]]]
+
+    ; Use enum in conditionals
+    [let [[color : Int Red]]
+      [if [= color Red]
+        [print "Color is Red"]
+        [print "Color is not Red"]]]
+    0]]
+
+; Test combining struct and enum
+[def test_combined : [ -> Int]
+  [fn [] : Int
+    [print "Testing combined usage:"]
+
+    ; Create a struct with enum field
+    [let [[r : Int Red]
+          [point : Any [struct-new "ColoredPoint" 5 10 r]]]
+      [print [str-concat "ColoredPoint x = " [int-to-str [struct-get point 0]]]]
+      [print [str-concat "ColoredPoint y = " [int-to-str [struct-get point 1]]]]
+      [print [str-concat "ColoredPoint color = " [int-to-str [struct-get point 2]]]]]
+    0]]
+
+; Main
+[def main : [ -> Int]
+  [fn [] : Int
+    [test_struct]
+    [test_enum]
+    [test_combined]
+    [print "All struct/enum tests passed!"]
+    0]]

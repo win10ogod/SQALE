@@ -16,6 +16,10 @@ typedef enum {
   TY_CHAN, // Channel of element type
   TY_VEC,
   TY_MAP,
+  TY_OPTION, // Option[T] - Some(T) or None
+  TY_RESULT, // Result[T,E] - Ok(T) or Err(E)
+  TY_STRUCT, // Named struct type
+  TY_ENUM,   // Enum type
   TY_ERROR,
 } TypeKind;
 
@@ -26,6 +30,9 @@ struct Type {
   union {
     struct { Type **params; size_t arity; Type *ret; } fn;
     struct { Type *elem; } chan;
+    struct { Type *ok_type; Type *err_type; } result; // For TY_RESULT
+    struct { const char *name; Type **fields; const char **field_names; size_t nfields; } struc; // For TY_STRUCT
+    struct { const char *name; const char **variants; size_t nvariants; } enu; // For TY_ENUM
   } as;
 };
 
@@ -45,6 +52,10 @@ Type *ty_func(void *arena, Type **params, size_t arity, Type *ret);
 Type *ty_chan(void *arena, Type *elem);
 Type *ty_vec(void *arena, Type *elem);
 Type *ty_map(void *arena, Type *key, Type *val);
+Type *ty_option(void *arena, Type *elem);
+Type *ty_result(void *arena, Type *ok_type, Type *err_type);
+Type *ty_struct(void *arena, const char *name, Type **fields, const char **field_names, size_t nfields);
+Type *ty_enum(void *arena, const char *name, const char **variants, size_t nvariants);
 
 // Utilities
 bool ty_eq(const Type *a, const Type *b);

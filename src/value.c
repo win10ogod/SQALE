@@ -12,3 +12,8 @@ Value v_symbol(const char *name, int32_t len){ Value v; v.kind=VAL_SYMBOL; v.as.
 Value v_list(ValList *l){ Value v; v.kind=VAL_LIST; v.as.list=l; return v; }
 Value v_vec(Vector *vec){ Value v; v.kind=VAL_VEC; v.as.vec=vec; return v; }
 Value v_map(Map *m){ Value v; v.kind=VAL_MAP; v.as.map=m; return v; }
+Value v_some(OptionVal *o){ Value v; v.kind=VAL_OPTION; v.as.opt=o; return v; }
+Value v_none(void){ Value v; v.kind=VAL_OPTION; v.as.opt=NULL; return v; }
+Value v_ok(ResultVal *r){ Value v; v.kind=VAL_RESULT; v.as.res=r; return v; }
+Value v_err(ResultVal *r){ Value v; v.kind=VAL_RESULT; v.as.res=r; return v; }
+Value v_struct(StructVal *s){ Value v; v.kind=VAL_STRUCT; v.as.struc=s; return v; }

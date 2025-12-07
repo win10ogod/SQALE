@@ -1,0 +1,27 @@
+; Test all Phase 4 features
+
+[defstruct Point [[x : Int] [y : Int]]]
+[defenum Color [Red Green Blue]]
+
+[def test_struct : [ -> Int]
+  [fn [] : Int
+    [print "Testing struct creation:"]
+    [let [[p : Any [struct-new "Point" 10 20]]]
+      [print [str-concat "Point x = " [int-to-str [struct-get p 0]]]]
+      [print [str-concat "Point y = " [int-to-str [struct-get p 1]]]]]
+    0]]
+
+[def test_enum : [ -> Int]
+  [fn [] : Int
+    [print "Testing enum:"]
+    [print [str-concat "Red = " [int-to-str Red]]]
+    [print [str-concat "Green = " [int-to-str Green]]]
+    [print [str-concat "Blue = " [int-to-str Blue]]]
+    0]]
+
+[def main : [ -> Int]
+  [fn [] : Int
+    [test_struct]
+    [test_enum]
+    [print "All Phase 4 tests passed!"]
+    0]]

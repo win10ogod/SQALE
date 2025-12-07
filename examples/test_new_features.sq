@@ -1,0 +1,68 @@
+; Test new language features
+
+; Test while loop and set!
+[def test_while : [ -> Int]
+  [fn [] : Int
+    [print "Testing while loop:"]
+    [let [[i : Int 0]
+          [sum : Int 0]]
+      [while [< i 5]
+        [set! sum [+ sum i]]
+        [set! i [+ i 1]]]
+      [print [str-concat "Sum 0..4 = " [int-to-str sum]]]]
+    0]]
+
+; Test bitwise operations
+[def test_bitwise : [ -> Int]
+  [fn [] : Int
+    [print "Testing bitwise operations:"]
+    [print [str-concat "bit-and 0xFF 0x0F = " [int-to-str [bit-and 255 15]]]]
+    [print [str-concat "bit-or 0x0F 0xF0 = " [int-to-str [bit-or 15 240]]]]
+    [print [str-concat "bit-xor 0xFF 0x0F = " [int-to-str [bit-xor 255 15]]]]
+    [print [str-concat "bit-not 0 = " [int-to-str [bit-not 0]]]]
+    [print [str-concat "shl 1 4 = " [int-to-str [shl 1 4]]]]
+    [print [str-concat "shr 16 2 = " [int-to-str [shr 16 2]]]]
+    0]]
+
+; Test math functions
+[def test_math : [ -> Int]
+  [fn [] : Int
+    [print "Testing math functions:"]
+    [print [str-concat "abs -42 = " [int-to-str [abs -42]]]]
+    [print [str-concat "min 3 7 = " [int-to-str [min 3 7]]]]
+    [print [str-concat "max 3 7 = " [int-to-str [max 3 7]]]]
+    [print [str-concat "pow 2.0 10.0 = " [float-to-str [pow 2.0 10.0]]]]
+    [print [str-concat "sqrt 16.0 = " [float-to-str [sqrt 16.0]]]]
+    [print [str-concat "floor 3.7 = " [float-to-str [floor 3.7]]]]
+    [print [str-concat "ceil 3.2 = " [float-to-str [ceil 3.2]]]]
+    [print [str-concat "round 3.5 = " [float-to-str [round 3.5]]]]
+    0]]
+
+; Test string conversions
+[def test_conversions : [ -> Int]
+  [fn [] : Int
+    [print "Testing string conversions:"]
+    [print [str-concat "str-to-int \"123\" = " [int-to-str [str-to-int "123"]]]]
+    [print [str-concat "int-to-str 456 = " [int-to-str 456]]]
+    [print [str-concat "str-to-float \"3.14\" = " [float-to-str [str-to-float "3.14"]]]]
+    [print [str-concat "float-to-str 2.718 = " [float-to-str 2.718]]]
+    0]]
+
+; Test string operations
+[def test_strings : [ -> Int]
+  [fn [] : Int
+    [print "Testing string operations:"]
+    [print [str-concat "str-slice \"hello\" 1 4 = " [str-slice "hello" 1 4]]]
+    [print [str-concat "str-index \"hello\" \"ll\" = " [int-to-str [str-index "hello" "ll"]]]]
+    0]]
+
+; Main
+[def main : [ -> Int]
+  [fn [] : Int
+    [test_while]
+    [test_bitwise]
+    [test_math]
+    [test_conversions]
+    [test_strings]
+    [print "All new feature tests passed!"]
+    0]]

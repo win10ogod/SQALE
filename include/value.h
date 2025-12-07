@@ -21,6 +21,9 @@ typedef enum {
   VAL_LIST,
   VAL_VEC,
   VAL_MAP,
+  VAL_OPTION,  // Some(value) or None
+  VAL_RESULT,  // Ok(value) or Err(error)
+  VAL_STRUCT,  // User-defined struct
 } ValueKind;
 
 typedef struct Value Value;
@@ -68,6 +71,28 @@ typedef struct Map {
   int32_t len;
 } Map;
 
+// Option: has_value indicates Some vs None
+typedef struct OptionVal {
+  Obj hdr;
+  struct Value *value; // NULL for None
+  bool has_value;
+} OptionVal;
+
+// Result: is_ok indicates Ok vs Err
+typedef struct ResultVal {
+  Obj hdr;
+  struct Value *value; // Ok or Err value
+  bool is_ok;
+} ResultVal;
+
+// Struct instance
+typedef struct StructVal {
+  Obj hdr;
+  const char *type_name;
+  struct Value *fields;
+  int32_t nfields;
+} StructVal;
+
 struct Value {
   ValueKind kind;
   union {
@@ -82,6 +107,9 @@ struct Value {
     ValList *list;
     Vector *vec;
     Map *map;
+    OptionVal *opt;
+    ResultVal *res;
+    StructVal *struc;
   } as;
 };
 
@@ -98,5 +126,10 @@ Value v_symbol(const char *name, int32_t len);
 Value v_list(ValList *l);
 Value v_vec(Vector *v);
 Value v_map(Map *m);
+Value v_some(OptionVal *o);
+Value v_none(void);
+Value v_ok(ResultVal *r);
+Value v_err(ResultVal *r);
+Value v_struct(StructVal *s);
 
 #endif // VALUE_H

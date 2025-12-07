@@ -1,0 +1,76 @@
+; Test Option and Result types (Phase 3)
+
+; Test Option type
+[def test_option : [ -> Int]
+  [fn [] : Int
+    [print "Testing Option type:"]
+
+    ; Create Some and None
+    [let [[x : Any [some 42]]
+          [y : Any [none]]]
+      ; Test predicates
+      [if [some? x]
+        [print "x is Some"]
+        [print "x is None"]]
+      [if [none? y]
+        [print "y is None"]
+        [print "y is Some"]]
+
+      ; Test unwrap
+      [print [str-concat "unwrap x = " [int-to-str [unwrap x]]]]
+
+      ; Test unwrap-or
+      [print [str-concat "unwrap-or y 100 = " [int-to-str [unwrap-or y 100]]]]]
+    0]]
+
+; Test Result type
+[def test_result : [ -> Int]
+  [fn [] : Int
+    [print "Testing Result type:"]
+
+    ; Create Ok and Err
+    [let [[success : Any [ok 42]]
+          [failure : Any [err "something went wrong"]]]
+      ; Test predicates
+      [if [ok? success]
+        [print "success is Ok"]
+        [print "success is Err"]]
+      [if [err? failure]
+        [print "failure is Err"]
+        [print "failure is Ok"]]
+
+      ; Test unwrap on Ok
+      [print [str-concat "unwrap success = " [int-to-str [unwrap success]]]]
+
+      ; Test unwrap-or on Err
+      [print [str-concat "unwrap-or failure 0 = " [int-to-str [unwrap-or failure 0]]]]]
+    0]]
+
+; Test safe division with Result
+[def safe_divide : [Int Int -> Any]
+  [fn [[a : Int] [b : Int]] : Any
+    [if [= b 0]
+      [err "division by zero"]
+      [ok [/ a b]]]]]
+
+[def test_safe_divide : [ -> Int]
+  [fn [] : Int
+    [print "Testing safe division:"]
+    [let [[r1 : Any [safe_divide 10 2]]
+          [r2 : Any [safe_divide 10 0]]]
+      [if [ok? r1]
+        [print [str-concat "10/2 = " [int-to-str [unwrap r1]]]]
+        [print "10/2 failed"]]
+      [if [err? r2]
+        [print "10/0 correctly returned error"]
+        [print "10/0 should have failed"]]]
+    0]]
+
+; Main
+[def main : [ -> Int]
+  [fn [] : Int
+    [test_option]
+    [test_result]
+    [test_safe_divide]
+    [print "All Option/Result tests passed!"]
+    0]]

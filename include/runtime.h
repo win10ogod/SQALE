@@ -43,9 +43,51 @@ Value rt_add(Env *env, Value *args, int nargs);
 Value rt_sub(Env *env, Value *args, int nargs);
 Value rt_mul(Env *env, Value *args, int nargs);
 Value rt_div(Env *env, Value *args, int nargs);
+Value rt_mod(Env *env, Value *args, int nargs);
+Value rt_neg(Env *env, Value *args, int nargs);
+
+// Comparison
 Value rt_eq(Env *env, Value *args, int nargs);
+Value rt_ne(Env *env, Value *args, int nargs);
 Value rt_lt(Env *env, Value *args, int nargs);
 Value rt_gt(Env *env, Value *args, int nargs);
+Value rt_le(Env *env, Value *args, int nargs);
+Value rt_ge(Env *env, Value *args, int nargs);
+
+// Logical
+Value rt_not(Env *env, Value *args, int nargs);
+Value rt_and(Env *env, Value *args, int nargs);
+Value rt_or(Env *env, Value *args, int nargs);
+
+// String operations
+Value rt_str_concat(Env *env, Value *args, int nargs);
+Value rt_str_len(Env *env, Value *args, int nargs);
+Value rt_str_slice(Env *env, Value *args, int nargs);
+Value rt_str_index(Env *env, Value *args, int nargs);
+
+// Bitwise operations
+Value rt_bit_and(Env *env, Value *args, int nargs);
+Value rt_bit_or(Env *env, Value *args, int nargs);
+Value rt_bit_xor(Env *env, Value *args, int nargs);
+Value rt_bit_not(Env *env, Value *args, int nargs);
+Value rt_shl(Env *env, Value *args, int nargs);
+Value rt_shr(Env *env, Value *args, int nargs);
+
+// Extended math
+Value rt_abs(Env *env, Value *args, int nargs);
+Value rt_min(Env *env, Value *args, int nargs);
+Value rt_max(Env *env, Value *args, int nargs);
+Value rt_pow(Env *env, Value *args, int nargs);
+Value rt_sqrt(Env *env, Value *args, int nargs);
+Value rt_floor(Env *env, Value *args, int nargs);
+Value rt_ceil(Env *env, Value *args, int nargs);
+Value rt_round(Env *env, Value *args, int nargs);
+
+// String conversions
+Value rt_str_to_int(Env *env, Value *args, int nargs);
+Value rt_int_to_str(Env *env, Value *args, int nargs);
+Value rt_str_to_float(Env *env, Value *args, int nargs);
+Value rt_float_to_str(Env *env, Value *args, int nargs);
 
 // Concurrency
 typedef struct Channel Channel;
@@ -75,5 +117,45 @@ Value rt_map_new(Env *env, Value *args, int nargs);
 Value rt_map_set(Env *env, Value *args, int nargs);
 Value rt_map_get(Env *env, Value *args, int nargs);
 Value rt_map_len(Env *env, Value *args, int nargs);
+
+// Option type operations
+Value rt_some(Env *env, Value *args, int nargs);
+Value rt_none_val(Env *env, Value *args, int nargs);
+Value rt_is_some(Env *env, Value *args, int nargs);
+Value rt_is_none(Env *env, Value *args, int nargs);
+Value rt_unwrap(Env *env, Value *args, int nargs);
+Value rt_unwrap_or(Env *env, Value *args, int nargs);
+
+// Result type operations
+Value rt_ok_val(Env *env, Value *args, int nargs);
+Value rt_err_val(Env *env, Value *args, int nargs);
+Value rt_is_ok(Env *env, Value *args, int nargs);
+Value rt_is_err(Env *env, Value *args, int nargs);
+Value rt_unwrap_err(Env *env, Value *args, int nargs);
+
+// Struct operations
+Value rt_struct_new(Env *env, Value *args, int nargs);
+Value rt_struct_get(Env *env, Value *args, int nargs);
+Value rt_struct_set(Env *env, Value *args, int nargs);
+
+// ============================================================================
+// LLVM Runtime Interface
+// These functions are called from LLVM-generated code
+// ============================================================================
+
+// Print functions (no newline, caller adds newline)
+void sq_print_i64(long long v);
+void sq_print_f64(double v);
+void sq_print_bool(int v);
+void sq_print_cstr(const char *s);
+void sq_print_newline(void);
+
+// Memory allocation
+void *sq_alloc(size_t size);
+
+// Closure support
+void *sq_alloc_closure(void *fn, void *env, int arity);
+void *sq_closure_get_fn(void *closure);
+void *sq_closure_get_env(void *closure);
 
 #endif // RUNTIME_H

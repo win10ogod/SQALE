@@ -61,9 +61,46 @@ Value rt_print(Env *env, Value *args, int nargs) {
   return v_unit();
 }
 
+// ============================================================================
 // LLVM/run-time shims for codegen
-void sq_print_i64(long long v) { printf("%lld\n", v); }
-void sq_print_cstr(const char *s) { if (s) { printf("%s\n", s); } else { printf("\n"); } }
+// These functions are called from LLVM-generated code
+// ============================================================================
+
+void sq_print_i64(long long v) { printf("%lld", v); }
+void sq_print_f64(double v) { printf("%g", v); }
+void sq_print_bool(int v) { printf(v ? "true" : "false"); }
+void sq_print_cstr(const char *s) { if (s) printf("%s", s); }
+void sq_print_newline(void) { printf("\n"); }
+
+// Runtime memory allocation for LLVM codegen
+void *sq_alloc(size_t size) {
+  return calloc(1, size);
+}
+
+// Closure allocation: stores function pointer, environment, and arity
+typedef struct {
+  void *fn;
+  void *env;
+  int arity;
+} SqClosure;
+
+void *sq_alloc_closure(void *fn, void *env, int arity) {
+  SqClosure *c = (SqClosure*)calloc(1, sizeof(SqClosure));
+  c->fn = fn;
+  c->env = env;
+  c->arity = arity;
+  return c;
+}
+
+void *sq_closure_get_fn(void *closure) {
+  if (!closure) return NULL;
+  return ((SqClosure*)closure)->fn;
+}
+
+void *sq_closure_get_env(void *closure) {
+  if (!closure) return NULL;
+  return ((SqClosure*)closure)->env;
+}
 
 static char *read_file_all(const char *path, size_t *out_len) {
   FILE *f = fopen(path, "rb"); if (!f) return NULL;
@@ -158,6 +195,282 @@ Value rt_gt(Env *env, Value *args, int nargs) {
   return v_bool(false);
 }
 
+// ============================================================================
+// Additional Comparison Operators
+// ============================================================================
+
+Value rt_le(Env *env, Value *args, int nargs) {
+  (void)env; if (nargs!=2) return v_bool(false);
+  Value a=args[0], b=args[1];
+  if (a.kind==VAL_INT && b.kind==VAL_INT) return v_bool(a.as.i<=b.as.i);
+  if (a.kind==VAL_FLOAT && b.kind==VAL_FLOAT) return v_bool(a.as.f<=b.as.f);
+  return v_bool(false);
+}
+
+Value rt_ge(Env *env, Value *args, int nargs) {
+  (void)env; if (nargs!=2) return v_bool(false);
+  Value a=args[0], b=args[1];
+  if (a.kind==VAL_INT && b.kind==VAL_INT) return v_bool(a.as.i>=b.as.i);
+  if (a.kind==VAL_FLOAT && b.kind==VAL_FLOAT) return v_bool(a.as.f>=b.as.f);
+  return v_bool(false);
+}
+
+Value rt_ne(Env *env, Value *args, int nargs) {
+  (void)env; if (nargs!=2) return v_bool(true);
+  Value a=args[0], b=args[1];
+  if (a.kind!=b.kind) return v_bool(true);
+  switch (a.kind) {
+    case VAL_INT: return v_bool(a.as.i!=b.as.i);
+    case VAL_FLOAT: return v_bool(a.as.f!=b.as.f);
+    case VAL_BOOL: return v_bool(a.as.b!=b.as.b);
+    case VAL_STR: return v_bool(a.as.str->len!=b.as.str->len || memcmp(a.as.str->data,b.as.str->data,a.as.str->len)!=0);
+    case VAL_UNIT: return v_bool(false);
+    default: return v_bool(true);
+  }
+}
+
+// ============================================================================
+// Logical Operators
+// ============================================================================
+
+Value rt_not(Env *env, Value *args, int nargs) {
+  (void)env; if (nargs!=1) return v_bool(false);
+  if (args[0].kind==VAL_BOOL) return v_bool(!args[0].as.b);
+  return v_bool(false);
+}
+
+Value rt_and(Env *env, Value *args, int nargs) {
+  (void)env; if (nargs!=2) return v_bool(false);
+  if (args[0].kind==VAL_BOOL && args[1].kind==VAL_BOOL)
+    return v_bool(args[0].as.b && args[1].as.b);
+  return v_bool(false);
+}
+
+Value rt_or(Env *env, Value *args, int nargs) {
+  (void)env; if (nargs!=2) return v_bool(false);
+  if (args[0].kind==VAL_BOOL && args[1].kind==VAL_BOOL)
+    return v_bool(args[0].as.b || args[1].as.b);
+  return v_bool(false);
+}
+
+// ============================================================================
+// Arithmetic: Modulo and Negation
+// ============================================================================
+
+Value rt_mod(Env *env, Value *args, int nargs) {
+  (void)env; if (nargs!=2) return v_int(0);
+  if (both_int(args[0],args[1])) {
+    if (args[1].as.i == 0) return v_int(0); // avoid division by zero
+    return v_int(args[0].as.i % args[1].as.i);
+  }
+  return v_int(0);
+}
+
+Value rt_neg(Env *env, Value *args, int nargs) {
+  (void)env; if (nargs!=1) return v_int(0);
+  if (args[0].kind==VAL_INT) return v_int(-args[0].as.i);
+  if (args[0].kind==VAL_FLOAT) return v_float(-args[0].as.f);
+  return v_int(0);
+}
+
+// ============================================================================
+// String Operations
+// ============================================================================
+
+Value rt_str_concat(Env *env, Value *args, int nargs) {
+  VM *vm = (VM*)env->aux;
+  if (nargs!=2 || args[0].kind!=VAL_STR || args[1].kind!=VAL_STR) return v_str(NULL);
+  String *a = args[0].as.str;
+  String *b = args[1].as.str;
+  size_t total = (size_t)(a->len + b->len);
+  char *buf = (char*)malloc(total+1);
+  memcpy(buf, a->data, a->len);
+  memcpy(buf + a->len, b->data, b->len);
+  buf[total] = '\0';
+  String *s = rt_string_new(vm, buf, total);
+  free(buf);
+  return v_str(s);
+}
+
+Value rt_str_len(Env *env, Value *args, int nargs) {
+  (void)env;
+  if (nargs!=1 || args[0].kind!=VAL_STR) return v_int(0);
+  return v_int(args[0].as.str->len);
+}
+
+// ============================================================================
+// Bitwise Operations
+// ============================================================================
+
+Value rt_bit_and(Env *env, Value *args, int nargs) {
+  (void)env; if (nargs!=2) return v_int(0);
+  if (both_int(args[0],args[1])) return v_int(args[0].as.i & args[1].as.i);
+  return v_int(0);
+}
+
+Value rt_bit_or(Env *env, Value *args, int nargs) {
+  (void)env; if (nargs!=2) return v_int(0);
+  if (both_int(args[0],args[1])) return v_int(args[0].as.i | args[1].as.i);
+  return v_int(0);
+}
+
+Value rt_bit_xor(Env *env, Value *args, int nargs) {
+  (void)env; if (nargs!=2) return v_int(0);
+  if (both_int(args[0],args[1])) return v_int(args[0].as.i ^ args[1].as.i);
+  return v_int(0);
+}
+
+Value rt_bit_not(Env *env, Value *args, int nargs) {
+  (void)env; if (nargs!=1) return v_int(0);
+  if (args[0].kind==VAL_INT) return v_int(~args[0].as.i);
+  return v_int(0);
+}
+
+Value rt_shl(Env *env, Value *args, int nargs) {
+  (void)env; if (nargs!=2) return v_int(0);
+  if (both_int(args[0],args[1])) return v_int(args[0].as.i << args[1].as.i);
+  return v_int(0);
+}
+
+Value rt_shr(Env *env, Value *args, int nargs) {
+  (void)env; if (nargs!=2) return v_int(0);
+  if (both_int(args[0],args[1])) return v_int(args[0].as.i >> args[1].as.i);
+  return v_int(0);
+}
+
+// ============================================================================
+// Extended Math Functions
+// ============================================================================
+
+#include <math.h>
+
+Value rt_abs(Env *env, Value *args, int nargs) {
+  (void)env; if (nargs!=1) return v_int(0);
+  if (args[0].kind==VAL_INT) return v_int(args[0].as.i < 0 ? -args[0].as.i : args[0].as.i);
+  if (args[0].kind==VAL_FLOAT) return v_float(fabs(args[0].as.f));
+  return v_int(0);
+}
+
+Value rt_min(Env *env, Value *args, int nargs) {
+  (void)env; if (nargs!=2) return v_int(0);
+  if (both_int(args[0],args[1])) return v_int(args[0].as.i < args[1].as.i ? args[0].as.i : args[1].as.i);
+  if (both_float(args[0],args[1])) return v_float(args[0].as.f < args[1].as.f ? args[0].as.f : args[1].as.f);
+  return v_int(0);
+}
+
+Value rt_max(Env *env, Value *args, int nargs) {
+  (void)env; if (nargs!=2) return v_int(0);
+  if (both_int(args[0],args[1])) return v_int(args[0].as.i > args[1].as.i ? args[0].as.i : args[1].as.i);
+  if (both_float(args[0],args[1])) return v_float(args[0].as.f > args[1].as.f ? args[0].as.f : args[1].as.f);
+  return v_int(0);
+}
+
+Value rt_pow(Env *env, Value *args, int nargs) {
+  (void)env; if (nargs!=2) return v_float(0);
+  double a = args[0].kind==VAL_INT ? (double)args[0].as.i : (args[0].kind==VAL_FLOAT ? args[0].as.f : 0);
+  double b = args[1].kind==VAL_INT ? (double)args[1].as.i : (args[1].kind==VAL_FLOAT ? args[1].as.f : 0);
+  return v_float(pow(a, b));
+}
+
+Value rt_sqrt(Env *env, Value *args, int nargs) {
+  (void)env; if (nargs!=1) return v_float(0);
+  double x = args[0].kind==VAL_INT ? (double)args[0].as.i : (args[0].kind==VAL_FLOAT ? args[0].as.f : 0);
+  return v_float(sqrt(x));
+}
+
+Value rt_floor(Env *env, Value *args, int nargs) {
+  (void)env; if (nargs!=1) return v_float(0);
+  if (args[0].kind==VAL_FLOAT) return v_float(floor(args[0].as.f));
+  if (args[0].kind==VAL_INT) return v_float((double)args[0].as.i);
+  return v_float(0);
+}
+
+Value rt_ceil(Env *env, Value *args, int nargs) {
+  (void)env; if (nargs!=1) return v_float(0);
+  if (args[0].kind==VAL_FLOAT) return v_float(ceil(args[0].as.f));
+  if (args[0].kind==VAL_INT) return v_float((double)args[0].as.i);
+  return v_float(0);
+}
+
+Value rt_round(Env *env, Value *args, int nargs) {
+  (void)env; if (nargs!=1) return v_float(0);
+  if (args[0].kind==VAL_FLOAT) return v_float(round(args[0].as.f));
+  if (args[0].kind==VAL_INT) return v_float((double)args[0].as.i);
+  return v_float(0);
+}
+
+// ============================================================================
+// String Conversion Functions
+// ============================================================================
+
+Value rt_str_to_int(Env *env, Value *args, int nargs) {
+  (void)env; if (nargs!=1 || args[0].kind!=VAL_STR) return v_int(0);
+  char tmp[64];
+  size_t len = (size_t)args[0].as.str->len;
+  if (len >= sizeof(tmp)) len = sizeof(tmp)-1;
+  memcpy(tmp, args[0].as.str->data, len); tmp[len] = '\0';
+  return v_int(atoll(tmp));
+}
+
+Value rt_int_to_str(Env *env, Value *args, int nargs) {
+  VM *vm = (VM*)env->aux;
+  if (nargs!=1 || args[0].kind!=VAL_INT) return v_str(NULL);
+  char buf[32];
+  int n = snprintf(buf, sizeof(buf), "%lld", (long long)args[0].as.i);
+  String *s = rt_string_new(vm, buf, (size_t)n);
+  return v_str(s);
+}
+
+Value rt_str_to_float(Env *env, Value *args, int nargs) {
+  (void)env; if (nargs!=1 || args[0].kind!=VAL_STR) return v_float(0);
+  char tmp[64];
+  size_t len = (size_t)args[0].as.str->len;
+  if (len >= sizeof(tmp)) len = sizeof(tmp)-1;
+  memcpy(tmp, args[0].as.str->data, len); tmp[len] = '\0';
+  return v_float(atof(tmp));
+}
+
+Value rt_float_to_str(Env *env, Value *args, int nargs) {
+  VM *vm = (VM*)env->aux;
+  if (nargs!=1 || args[0].kind!=VAL_FLOAT) return v_str(NULL);
+  char buf[64];
+  int n = snprintf(buf, sizeof(buf), "%g", args[0].as.f);
+  String *s = rt_string_new(vm, buf, (size_t)n);
+  return v_str(s);
+}
+
+// ============================================================================
+// Additional String Operations
+// ============================================================================
+
+Value rt_str_slice(Env *env, Value *args, int nargs) {
+  VM *vm = (VM*)env->aux;
+  if (nargs!=3 || args[0].kind!=VAL_STR || args[1].kind!=VAL_INT || args[2].kind!=VAL_INT)
+    return v_str(NULL);
+  String *s = args[0].as.str;
+  int64_t start = args[1].as.i;
+  int64_t end = args[2].as.i;
+  if (start < 0) start = 0;
+  if (end > s->len) end = s->len;
+  if (start >= end) return v_str(rt_string_new(vm, "", 0));
+  String *result = rt_string_new(vm, s->data + start, (size_t)(end - start));
+  return v_str(result);
+}
+
+Value rt_str_index(Env *env, Value *args, int nargs) {
+  (void)env;
+  if (nargs!=2 || args[0].kind!=VAL_STR || args[1].kind!=VAL_STR) return v_int(-1);
+  String *haystack = args[0].as.str;
+  String *needle = args[1].as.str;
+  if (needle->len == 0) return v_int(0);
+  if (needle->len > haystack->len) return v_int(-1);
+  for (int64_t i = 0; i <= haystack->len - needle->len; i++) {
+    if (memcmp(haystack->data + i, needle->data, (size_t)needle->len) == 0)
+      return v_int(i);
+  }
+  return v_int(-1);
+}
+
 Value rt_chan(Env *env, Value *args, int nargs) {
   (void)env; (void)args; if (nargs!=0) { /* type info not used at runtime here */ }
   Channel *c = rt_channel_new(16);
@@ -235,5 +548,168 @@ static int map_get_pair(Map *m, String *k, int64_t *out){ uint64_t h=hash_str(k-
 
 Value rt_map_new(Env *env, Value *args, int nargs){ (void)args; (void)nargs; VM *vm=(VM*)env->aux; Map *m=map_new_gc(vm, 16); return v_map(m);} 
 Value rt_map_set(Env *env, Value *args, int nargs){ (void)env; if (nargs!=3 || args[0].kind!=VAL_MAP || args[1].kind!=VAL_STR || args[2].kind!=VAL_INT) return v_unit(); map_set_pair(args[0].as.map, args[1].as.str, args[2].as.i); return v_unit(); }
-Value rt_map_get(Env *env, Value *args, int nargs){ (void)env; if (nargs!=2 || args[0].kind!=VAL_MAP || args[1].kind!=VAL_STR) return v_int(0); int64_t out=0; if (map_get_pair(args[0].as.map,args[1].as.str,&out)) return v_int(out); return v_int(0);} 
-Value rt_map_len(Env *env, Value *args, int nargs){ (void)env; if (nargs!=1 || args[0].kind!=VAL_MAP) return v_int(0); return v_int(args[0].as.map->len);} 
+Value rt_map_get(Env *env, Value *args, int nargs){ (void)env; if (nargs!=2 || args[0].kind!=VAL_MAP || args[1].kind!=VAL_STR) return v_int(0); int64_t out=0; if (map_get_pair(args[0].as.map,args[1].as.str,&out)) return v_int(out); return v_int(0);}
+Value rt_map_len(Env *env, Value *args, int nargs){ (void)env; if (nargs!=1 || args[0].kind!=VAL_MAP) return v_int(0); return v_int(args[0].as.map->len);}
+
+// ============================================================================
+// Option Type Operations
+// ============================================================================
+
+Value rt_some(Env *env, Value *args, int nargs) {
+  VM *vm = (VM*)env->aux;
+  if (nargs != 1) return v_none();
+  OptionVal *opt = (OptionVal*)gc_alloc(&vm->gc, sizeof(OptionVal), 10);
+  opt->value = (Value*)malloc(sizeof(Value));
+  *opt->value = args[0];
+  opt->has_value = true;
+  return v_some(opt);
+}
+
+Value rt_none_val(Env *env, Value *args, int nargs) {
+  (void)env; (void)args; (void)nargs;
+  return v_none();
+}
+
+Value rt_is_some(Env *env, Value *args, int nargs) {
+  (void)env;
+  if (nargs != 1 || args[0].kind != VAL_OPTION) return v_bool(false);
+  return v_bool(args[0].as.opt != NULL && args[0].as.opt->has_value);
+}
+
+Value rt_is_none(Env *env, Value *args, int nargs) {
+  (void)env;
+  if (nargs != 1 || args[0].kind != VAL_OPTION) return v_bool(true);
+  return v_bool(args[0].as.opt == NULL || !args[0].as.opt->has_value);
+}
+
+Value rt_unwrap(Env *env, Value *args, int nargs) {
+  (void)env;
+  if (nargs != 1) return v_unit();
+  if (args[0].kind == VAL_OPTION) {
+    if (args[0].as.opt && args[0].as.opt->has_value)
+      return *args[0].as.opt->value;
+    fprintf(stderr, "unwrap: called on None\n");
+    return v_unit();
+  }
+  if (args[0].kind == VAL_RESULT) {
+    if (args[0].as.res && args[0].as.res->is_ok)
+      return *args[0].as.res->value;
+    fprintf(stderr, "unwrap: called on Err\n");
+    return v_unit();
+  }
+  return v_unit();
+}
+
+Value rt_unwrap_or(Env *env, Value *args, int nargs) {
+  (void)env;
+  if (nargs != 2) return v_unit();
+  if (args[0].kind == VAL_OPTION) {
+    if (args[0].as.opt && args[0].as.opt->has_value)
+      return *args[0].as.opt->value;
+    return args[1]; // default value
+  }
+  if (args[0].kind == VAL_RESULT) {
+    if (args[0].as.res && args[0].as.res->is_ok)
+      return *args[0].as.res->value;
+    return args[1]; // default value
+  }
+  return args[1];
+}
+
+// ============================================================================
+// Result Type Operations
+// ============================================================================
+
+Value rt_ok_val(Env *env, Value *args, int nargs) {
+  VM *vm = (VM*)env->aux;
+  if (nargs != 1) return v_unit();
+  ResultVal *res = (ResultVal*)gc_alloc(&vm->gc, sizeof(ResultVal), 11);
+  res->value = (Value*)malloc(sizeof(Value));
+  *res->value = args[0];
+  res->is_ok = true;
+  return v_ok(res);
+}
+
+Value rt_err_val(Env *env, Value *args, int nargs) {
+  VM *vm = (VM*)env->aux;
+  if (nargs != 1) return v_unit();
+  ResultVal *res = (ResultVal*)gc_alloc(&vm->gc, sizeof(ResultVal), 11);
+  res->value = (Value*)malloc(sizeof(Value));
+  *res->value = args[0];
+  res->is_ok = false;
+  return v_err(res);
+}
+
+Value rt_is_ok(Env *env, Value *args, int nargs) {
+  (void)env;
+  if (nargs != 1 || args[0].kind != VAL_RESULT) return v_bool(false);
+  return v_bool(args[0].as.res && args[0].as.res->is_ok);
+}
+
+Value rt_is_err(Env *env, Value *args, int nargs) {
+  (void)env;
+  if (nargs != 1 || args[0].kind != VAL_RESULT) return v_bool(true);
+  return v_bool(!args[0].as.res || !args[0].as.res->is_ok);
+}
+
+Value rt_unwrap_err(Env *env, Value *args, int nargs) {
+  (void)env;
+  if (nargs != 1 || args[0].kind != VAL_RESULT) return v_unit();
+  if (args[0].as.res && !args[0].as.res->is_ok)
+    return *args[0].as.res->value;
+  fprintf(stderr, "unwrap-err: called on Ok\n");
+  return v_unit();
+}
+
+// ============================================================================
+// Struct Operations
+// ============================================================================
+
+Value rt_struct_get(Env *env, Value *args, int nargs) {
+  (void)env;
+  if (nargs != 2 || args[0].kind != VAL_STRUCT || args[1].kind != VAL_INT)
+    return v_unit();
+  StructVal *s = args[0].as.struc;
+  int64_t idx = args[1].as.i;
+  if (idx < 0 || idx >= s->nfields) return v_unit();
+  return s->fields[idx];
+}
+
+Value rt_struct_set(Env *env, Value *args, int nargs) {
+  (void)env;
+  if (nargs != 3 || args[0].kind != VAL_STRUCT || args[1].kind != VAL_INT)
+    return v_unit();
+  StructVal *s = args[0].as.struc;
+  int64_t idx = args[1].as.i;
+  if (idx < 0 || idx >= s->nfields) return v_unit();
+  s->fields[idx] = args[2];
+  return v_unit();
+}
+
+// Create a new struct instance with given name and fields
+Value rt_struct_new(Env *env, Value *args, int nargs) {
+  if (nargs < 1 || args[0].kind != VAL_STR) return v_unit();
+  const char *name = args[0].as.str->data;
+  int32_t n = (int32_t)(nargs - 1);
+
+  // Allocate struct through GC
+  VM *vm = (VM*)env->aux;
+  StructVal *s = (StructVal*)gc_alloc(&vm->gc, sizeof(StructVal), 6);
+  s->type_name = name;
+  s->nfields = n;
+  s->fields = (Value*)malloc(sizeof(Value) * n);
+  for (int32_t i = 0; i < n; i++) {
+    s->fields[i] = args[i + 1];
+  }
+  return v_struct(s);
+}
+
+// Get struct field by name
+Value rt_struct_get_field(Env *env, Value *args, int nargs) {
+  (void)env;
+  if (nargs != 2 || args[0].kind != VAL_STRUCT || args[1].kind != VAL_STR)
+    return v_unit();
+  // For named access, we'd need to store field names in StructVal
+  // For now, fall back to index-based access
+  return v_unit();
+} 
