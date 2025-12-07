@@ -37,6 +37,21 @@ VM *vm_new(void) {
   vb = (Value*)malloc(sizeof(Value)); *vb = v_native(rt_eq, ty_func(NULL, (Type*[]){ty_any(NULL),ty_any(NULL)},2,ty_bool(NULL))); env_set(vm->global_env, "=", vb->as.native.type, vb);
   vb = (Value*)malloc(sizeof(Value)); *vb = v_native(rt_lt, ty_func(NULL, (Type*[]){t_i,t_i},2,ty_bool(NULL))); env_set(vm->global_env, "<", vb->as.native.type, vb);
   vb = (Value*)malloc(sizeof(Value)); *vb = v_native(rt_gt, ty_func(NULL, (Type*[]){t_i,t_i},2,ty_bool(NULL))); env_set(vm->global_env, ">", vb->as.native.type, vb);
+  vb = (Value*)malloc(sizeof(Value)); *vb = v_native(rt_le, ty_func(NULL, (Type*[]){t_i,t_i},2,ty_bool(NULL))); env_set(vm->global_env, "<=", vb->as.native.type, vb);
+  vb = (Value*)malloc(sizeof(Value)); *vb = v_native(rt_ge, ty_func(NULL, (Type*[]){t_i,t_i},2,ty_bool(NULL))); env_set(vm->global_env, ">=", vb->as.native.type, vb);
+  vb = (Value*)malloc(sizeof(Value)); *vb = v_native(rt_ne, ty_func(NULL, (Type*[]){ty_any(NULL),ty_any(NULL)},2,ty_bool(NULL))); env_set(vm->global_env, "!=", vb->as.native.type, vb);
+  // Logical operators
+  vb = (Value*)malloc(sizeof(Value)); *vb = v_native(rt_not, ty_func(NULL, (Type*[]){ty_bool(NULL)},1,ty_bool(NULL))); env_set(vm->global_env, "not", vb->as.native.type, vb);
+  vb = (Value*)malloc(sizeof(Value)); *vb = v_native(rt_and, ty_func(NULL, (Type*[]){ty_bool(NULL),ty_bool(NULL)},2,ty_bool(NULL))); env_set(vm->global_env, "and", vb->as.native.type, vb);
+  vb = (Value*)malloc(sizeof(Value)); *vb = v_native(rt_or, ty_func(NULL, (Type*[]){ty_bool(NULL),ty_bool(NULL)},2,ty_bool(NULL))); env_set(vm->global_env, "or", vb->as.native.type, vb);
+  // Modulo and negation
+  vb = (Value*)malloc(sizeof(Value)); *vb = v_native(rt_mod, ty_func(NULL, (Type*[]){t_i,t_i},2,t_i)); env_set(vm->global_env, "mod", vb->as.native.type, vb);
+  vb = (Value*)malloc(sizeof(Value)); *vb = v_native(rt_mod, ty_func(NULL, (Type*[]){t_i,t_i},2,t_i)); env_set(vm->global_env, "%", vb->as.native.type, vb);
+  vb = (Value*)malloc(sizeof(Value)); *vb = v_native(rt_neg, ty_func(NULL, (Type*[]){t_i},1,t_i)); env_set(vm->global_env, "neg", vb->as.native.type, vb);
+  // String operations
+  Type *t_s = ty_str(NULL);
+  vb = (Value*)malloc(sizeof(Value)); *vb = v_native(rt_str_concat, ty_func(NULL, (Type*[]){t_s,t_s},2,t_s)); env_set(vm->global_env, "str-concat", vb->as.native.type, vb);
+  vb = (Value*)malloc(sizeof(Value)); *vb = v_native(rt_str_len, ty_func(NULL, (Type*[]){t_s},1,t_i)); env_set(vm->global_env, "str-len", vb->as.native.type, vb);
   vb = (Value*)malloc(sizeof(Value)); *vb = v_native(rt_chan, ty_func(NULL, (Type*[]){},0, ty_chan(NULL, t_i)));
   env_set(vm->global_env, "chan", vb->as.native.type, vb);
   vb = (Value*)malloc(sizeof(Value)); *vb = v_native(rt_send, ty_func(NULL, (Type*[]){ ty_chan(NULL, t_i), t_i }, 2, ty_bool(NULL)));
@@ -197,7 +212,8 @@ static Value eval_list(VM *vm, Env *env, Node *list) {
       }
       Value result = v_unit();
       for (size_t i=2;i<n;i++) result = eval_node(vm, child, list->as.list.items[i]);
-      env_free(child);
+      // NOTE: Don't free child - closures may have captured it (GC should handle this)
+      // env_free(child);
       return result;
     }
     if (is_sym(head, "if")) {
@@ -273,7 +289,8 @@ Value vm_call_closure(VM *vm, Closure *c, Value *args, int nargs) {
   // optional ':' ret-type
   if (fn->as.list.count>i0 && is_sym(fn->as.list.items[i0], ":")) i0+=2;
   for (size_t i=i0;i<fn->as.list.count;i++) result = eval_node(vm, callenv, fn->as.list.items[i]);
-  env_free(callenv);
+  // NOTE: Don't free callenv - closures may have captured it (GC should handle this)
+  // env_free(callenv);
   return result;
 }
 

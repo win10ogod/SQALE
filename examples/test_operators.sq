@@ -1,0 +1,71 @@
+; Test all operators for language completeness
+
+; Test comparison operators
+[def test_comparisons : [ -> Int]
+  [fn [] : Int
+    [print "Testing comparison operators:"]
+    ; Less than or equal
+    [if [<= 3 5] [print "3 <= 5: true"] [print "3 <= 5: false"]]
+    [if [<= 5 5] [print "5 <= 5: true"] [print "5 <= 5: false"]]
+    [if [<= 7 5] [print "7 <= 5: true"] [print "7 <= 5: false"]]
+    ; Greater than or equal
+    [if [>= 7 5] [print "7 >= 5: true"] [print "7 >= 5: false"]]
+    [if [>= 5 5] [print "5 >= 5: true"] [print "5 >= 5: false"]]
+    [if [>= 3 5] [print "3 >= 5: true"] [print "3 >= 5: false"]]
+    ; Not equal
+    [if [!= 3 5] [print "3 != 5: true"] [print "3 != 5: false"]]
+    [if [!= 5 5] [print "5 != 5: true"] [print "5 != 5: false"]]
+    0]]
+
+; Test logical operators
+[def test_logic : [ -> Int]
+  [fn [] : Int
+    [print "Testing logical operators:"]
+    ; not
+    [if [not true] [print "not true: true"] [print "not true: false"]]
+    [if [not false] [print "not false: true"] [print "not false: false"]]
+    ; and
+    [if [and true true] [print "true and true: true"] [print "true and true: false"]]
+    [if [and true false] [print "true and false: true"] [print "true and false: false"]]
+    [if [and false false] [print "false and false: true"] [print "false and false: false"]]
+    ; or
+    [if [or true false] [print "true or false: true"] [print "true or false: false"]]
+    [if [or false false] [print "false or false: true"] [print "false or false: false"]]
+    0]]
+
+; Test modulo operator
+[def test_modulo : [ -> Int]
+  [fn [] : Int
+    [print "Testing modulo operator:"]
+    [print [mod 10 3]]      ; expect 1
+    [print [mod 15 4]]      ; expect 3
+    [print [% 20 7]]        ; expect 6
+    0]]
+
+; Test negation
+[def test_negation : [ -> Int]
+  [fn [] : Int
+    [print "Testing negation:"]
+    [print [neg 5]]         ; expect -5
+    [print [neg 0]]         ; expect 0
+    [print [- 0 42]]        ; expect -42
+    0]]
+
+; Test string operations
+[def test_strings : [ -> Int]
+  [fn [] : Int
+    [print "Testing string operations:"]
+    [print [str-concat "Hello, " "World!"]]
+    [print [str-len "Hello"]]   ; expect 5
+    0]]
+
+; Main test runner
+[def main : [ -> Int]
+  [fn [] : Int
+    [test_comparisons]
+    [test_logic]
+    [test_modulo]
+    [test_negation]
+    [test_strings]
+    [print "All operator tests completed!"]
+    0]]

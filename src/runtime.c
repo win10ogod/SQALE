@@ -195,6 +195,109 @@ Value rt_gt(Env *env, Value *args, int nargs) {
   return v_bool(false);
 }
 
+// ============================================================================
+// Additional Comparison Operators
+// ============================================================================
+
+Value rt_le(Env *env, Value *args, int nargs) {
+  (void)env; if (nargs!=2) return v_bool(false);
+  Value a=args[0], b=args[1];
+  if (a.kind==VAL_INT && b.kind==VAL_INT) return v_bool(a.as.i<=b.as.i);
+  if (a.kind==VAL_FLOAT && b.kind==VAL_FLOAT) return v_bool(a.as.f<=b.as.f);
+  return v_bool(false);
+}
+
+Value rt_ge(Env *env, Value *args, int nargs) {
+  (void)env; if (nargs!=2) return v_bool(false);
+  Value a=args[0], b=args[1];
+  if (a.kind==VAL_INT && b.kind==VAL_INT) return v_bool(a.as.i>=b.as.i);
+  if (a.kind==VAL_FLOAT && b.kind==VAL_FLOAT) return v_bool(a.as.f>=b.as.f);
+  return v_bool(false);
+}
+
+Value rt_ne(Env *env, Value *args, int nargs) {
+  (void)env; if (nargs!=2) return v_bool(true);
+  Value a=args[0], b=args[1];
+  if (a.kind!=b.kind) return v_bool(true);
+  switch (a.kind) {
+    case VAL_INT: return v_bool(a.as.i!=b.as.i);
+    case VAL_FLOAT: return v_bool(a.as.f!=b.as.f);
+    case VAL_BOOL: return v_bool(a.as.b!=b.as.b);
+    case VAL_STR: return v_bool(a.as.str->len!=b.as.str->len || memcmp(a.as.str->data,b.as.str->data,a.as.str->len)!=0);
+    case VAL_UNIT: return v_bool(false);
+    default: return v_bool(true);
+  }
+}
+
+// ============================================================================
+// Logical Operators
+// ============================================================================
+
+Value rt_not(Env *env, Value *args, int nargs) {
+  (void)env; if (nargs!=1) return v_bool(false);
+  if (args[0].kind==VAL_BOOL) return v_bool(!args[0].as.b);
+  return v_bool(false);
+}
+
+Value rt_and(Env *env, Value *args, int nargs) {
+  (void)env; if (nargs!=2) return v_bool(false);
+  if (args[0].kind==VAL_BOOL && args[1].kind==VAL_BOOL)
+    return v_bool(args[0].as.b && args[1].as.b);
+  return v_bool(false);
+}
+
+Value rt_or(Env *env, Value *args, int nargs) {
+  (void)env; if (nargs!=2) return v_bool(false);
+  if (args[0].kind==VAL_BOOL && args[1].kind==VAL_BOOL)
+    return v_bool(args[0].as.b || args[1].as.b);
+  return v_bool(false);
+}
+
+// ============================================================================
+// Arithmetic: Modulo and Negation
+// ============================================================================
+
+Value rt_mod(Env *env, Value *args, int nargs) {
+  (void)env; if (nargs!=2) return v_int(0);
+  if (both_int(args[0],args[1])) {
+    if (args[1].as.i == 0) return v_int(0); // avoid division by zero
+    return v_int(args[0].as.i % args[1].as.i);
+  }
+  return v_int(0);
+}
+
+Value rt_neg(Env *env, Value *args, int nargs) {
+  (void)env; if (nargs!=1) return v_int(0);
+  if (args[0].kind==VAL_INT) return v_int(-args[0].as.i);
+  if (args[0].kind==VAL_FLOAT) return v_float(-args[0].as.f);
+  return v_int(0);
+}
+
+// ============================================================================
+// String Operations
+// ============================================================================
+
+Value rt_str_concat(Env *env, Value *args, int nargs) {
+  VM *vm = (VM*)env->aux;
+  if (nargs!=2 || args[0].kind!=VAL_STR || args[1].kind!=VAL_STR) return v_str(NULL);
+  String *a = args[0].as.str;
+  String *b = args[1].as.str;
+  size_t total = (size_t)(a->len + b->len);
+  char *buf = (char*)malloc(total+1);
+  memcpy(buf, a->data, a->len);
+  memcpy(buf + a->len, b->data, b->len);
+  buf[total] = '\0';
+  String *s = rt_string_new(vm, buf, total);
+  free(buf);
+  return v_str(s);
+}
+
+Value rt_str_len(Env *env, Value *args, int nargs) {
+  (void)env;
+  if (nargs!=1 || args[0].kind!=VAL_STR) return v_int(0);
+  return v_int(args[0].as.str->len);
+}
+
 Value rt_chan(Env *env, Value *args, int nargs) {
   (void)env; (void)args; if (nargs!=0) { /* type info not used at runtime here */ }
   Channel *c = rt_channel_new(16);

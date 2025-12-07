@@ -43,9 +43,25 @@ Value rt_add(Env *env, Value *args, int nargs);
 Value rt_sub(Env *env, Value *args, int nargs);
 Value rt_mul(Env *env, Value *args, int nargs);
 Value rt_div(Env *env, Value *args, int nargs);
+Value rt_mod(Env *env, Value *args, int nargs);
+Value rt_neg(Env *env, Value *args, int nargs);
+
+// Comparison
 Value rt_eq(Env *env, Value *args, int nargs);
+Value rt_ne(Env *env, Value *args, int nargs);
 Value rt_lt(Env *env, Value *args, int nargs);
 Value rt_gt(Env *env, Value *args, int nargs);
+Value rt_le(Env *env, Value *args, int nargs);
+Value rt_ge(Env *env, Value *args, int nargs);
+
+// Logical
+Value rt_not(Env *env, Value *args, int nargs);
+Value rt_and(Env *env, Value *args, int nargs);
+Value rt_or(Env *env, Value *args, int nargs);
+
+// String operations
+Value rt_str_concat(Env *env, Value *args, int nargs);
+Value rt_str_len(Env *env, Value *args, int nargs);
 
 // Concurrency
 typedef struct Channel Channel;

@@ -3,10 +3,10 @@
 #include <string.h>
 
 static int is_sym_start(int c) {
-  return isalpha(c) || c=='_' || strchr("+-*/<>=!?", c)!=0;
+  return isalpha(c) || c=='_' || strchr("+-*/<>=!?%", c)!=0;
 }
 static int is_sym_part(int c) {
-  return isalnum(c) || c=='_' || strchr("+-*/<>=!?", c)!=0;
+  return isalnum(c) || c=='_' || strchr("+-*/<>=!?%", c)!=0;
 }
 
 void lexer_init(Lexer *lx, const char *src, size_t len) {

@@ -238,6 +238,10 @@ static void emit_runtime_decls(CgContext *ctx) {
   ir_append(ctx, "declare void @sq_print_newline()\n");
   ir_append(ctx, "declare i8* @sq_alloc(i64)\n");
   ir_append(ctx, "declare i8* @sq_alloc_closure(i8*, i8*, i32)\n");
+  ir_append(ctx, "; String operations\n");
+  ir_append(ctx, "declare i8* @sq_string_new(i8*, i64)\n");
+  ir_append(ctx, "declare i8* @sq_string_concat(i8*, i8*)\n");
+  ir_append(ctx, "declare i64 @sq_string_len(i8*)\n");
   ir_append(ctx, "\n");
 }
 
@@ -355,8 +359,41 @@ static int cg_binop_text(CgContext *ctx, const char *op, Node *left, Node *right
       ir_appendf(ctx, "  %%t%d = fcmp oge double %%t%d, %%t%d\n", t, l, r);
     else
       ir_appendf(ctx, "  %%t%d = icmp sge i64 %%t%d, %%t%d\n", t, l, r);
+  } else if (strcmp(op, "!=") == 0) {
+    if (left->ty && left->ty->kind == TY_FLOAT)
+      ir_appendf(ctx, "  %%t%d = fcmp one double %%t%d, %%t%d\n", t, l, r);
+    else
+      ir_appendf(ctx, "  %%t%d = icmp ne i64 %%t%d, %%t%d\n", t, l, r);
+  } else if (strcmp(op, "mod") == 0) {
+    ir_appendf(ctx, "  %%t%d = srem i64 %%t%d, %%t%d\n", t, l, r);
+  } else if (strcmp(op, "and") == 0) {
+    ir_appendf(ctx, "  %%t%d = and i1 %%t%d, %%t%d\n", t, l, r);
+  } else if (strcmp(op, "or") == 0) {
+    ir_appendf(ctx, "  %%t%d = or i1 %%t%d, %%t%d\n", t, l, r);
   } else {
     fprintf(stderr, "codegen: unknown binary operator: %s\n", op);
+    return -1;
+  }
+
+  return t;
+}
+
+// Generate code for unary operations
+static int cg_unop_text(CgContext *ctx, const char *op, Node *arg) {
+  int a = cg_expr_text(ctx, arg);
+  if (a < 0) return -1;
+
+  int t = new_tmp(ctx);
+
+  if (strcmp(op, "not") == 0) {
+    ir_appendf(ctx, "  %%t%d = xor i1 %%t%d, 1\n", t, a);
+  } else if (strcmp(op, "neg") == 0) {
+    if (arg->ty && arg->ty->kind == TY_FLOAT)
+      ir_appendf(ctx, "  %%t%d = fneg double %%t%d\n", t, a);
+    else
+      ir_appendf(ctx, "  %%t%d = sub i64 0, %%t%d\n", t, a);
+  } else {
+    fprintf(stderr, "codegen: unknown unary operator: %s\n", op);
     return -1;
   }
 
@@ -530,12 +567,14 @@ static int cg_call_text(CgContext *ctx, Node *list) {
     char fname[256];
     snprintf(fname, sizeof(fname), "%.*s", (int)head->as.sym.len, head->as.sym.ptr);
 
-    // Check for builtin operators
+    // Check for builtin binary operators
     if (strcmp(fname, "+") == 0 || strcmp(fname, "-") == 0 ||
         strcmp(fname, "*") == 0 || strcmp(fname, "/") == 0 ||
-        strcmp(fname, "%") == 0 || strcmp(fname, "=") == 0 ||
+        strcmp(fname, "%") == 0 || strcmp(fname, "mod") == 0 ||
+        strcmp(fname, "=") == 0 || strcmp(fname, "!=") == 0 ||
         strcmp(fname, "<") == 0 || strcmp(fname, ">") == 0 ||
-        strcmp(fname, "<=") == 0 || strcmp(fname, ">=") == 0) {
+        strcmp(fname, "<=") == 0 || strcmp(fname, ">=") == 0 ||
+        strcmp(fname, "and") == 0 || strcmp(fname, "or") == 0) {
       if (list->as.list.count == 3) {
         Type *ty = list->ty ? list->ty : ty_int(NULL);
         return cg_binop_text(ctx, fname, list->as.list.items[1],
@@ -543,9 +582,34 @@ static int cg_call_text(CgContext *ctx, Node *list) {
       }
     }
 
+    // Check for unary operators
+    if (strcmp(fname, "not") == 0 || strcmp(fname, "neg") == 0) {
+      if (list->as.list.count == 2) {
+        return cg_unop_text(ctx, fname, list->as.list.items[1]);
+      }
+    }
+
     // Check for print
     if (strcmp(fname, "print") == 0) {
       return cg_print_text(ctx, list);
+    }
+
+    // Check for string operations
+    if (strcmp(fname, "str-concat") == 0 && list->as.list.count == 3) {
+      int a = cg_expr_text(ctx, list->as.list.items[1]);
+      int b = cg_expr_text(ctx, list->as.list.items[2]);
+      if (a < 0 || b < 0) return -1;
+      int t = new_tmp(ctx);
+      ir_appendf(ctx, "  %%t%d = call i8* @sq_string_concat(i8* %%t%d, i8* %%t%d)\n", t, a, b);
+      return t;
+    }
+
+    if (strcmp(fname, "str-len") == 0 && list->as.list.count == 2) {
+      int a = cg_expr_text(ctx, list->as.list.items[1]);
+      if (a < 0) return -1;
+      int t = new_tmp(ctx);
+      ir_appendf(ctx, "  %%t%d = call i64 @sq_string_len(i8* %%t%d)\n", t, a);
+      return t;
     }
 
     // User-defined function call
