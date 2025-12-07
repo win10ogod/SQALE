@@ -33,8 +33,9 @@ make USE_LLVM=1
 # Emit LLVM IR
 ./build/sqale emit-ir examples/hello.sq -o out.ll
 
-# Compile IR to native
-clang out.ll -O2 -o a.out
+# Compile IR to native (requires runtime)
+cc -c src/runtime_llvm.c -o build/runtime_llvm.o
+clang out.ll build/runtime_llvm.o -O2 -o a.out
 
 # Run smoke tests
 bash scripts/run_tests.sh
@@ -239,6 +240,47 @@ if (e && e->value) { /* use value */ }
 - Return 0 for success, non-zero for failure
 - Output should be deterministic and verifiable
 
+## LLVM Backend
+
+The LLVM backend (`src/codegen_llvm.c`) generates LLVM IR from the typed AST.
+
+### Supported Features
+- All basic types: Int (i64), Float (double), Bool (i1), Str (i8*), Unit (void)
+- Arithmetic: `+`, `-`, `*`, `/`, `%`
+- Comparisons: `=`, `<`, `>`, `<=`, `>=`
+- Control flow: `if`/`else` with phi nodes
+- Variable bindings: `let`
+- User-defined functions with recursion
+- Sequence blocks: `do`
+
+### Compilation Workflow
+```bash
+# 1. Generate IR
+./build/sqale emit-ir program.sq -o program.ll
+
+# 2. Compile runtime
+cc -c src/runtime_llvm.c -o build/runtime_llvm.o
+
+# 3. Link and compile
+clang program.ll build/runtime_llvm.o -O2 -o program
+
+# 4. Run
+./program
+```
+
+### Runtime Functions (runtime_llvm.c)
+The generated IR calls these runtime functions:
+- `sq_print_i64`, `sq_print_f64`, `sq_print_bool`, `sq_print_cstr` - Output
+- `sq_print_newline` - Line termination
+- `sq_alloc` - Memory allocation
+- `sq_alloc_closure`, `sq_closure_get_fn`, `sq_closure_get_env` - Closure support
+
+### Not Yet Implemented
+- Closures (environment capture)
+- Higher-order functions passed as values
+- Collections (Vec, Map)
+- Channels and threading
+
 ## Gotchas & Important Notes
 
 1. **Arena vs GC:** AST nodes use arena allocation (bulk freed). Runtime values (closures, strings, channels) use GC.
@@ -257,11 +299,11 @@ if (e && e->value) { /* use value */ }
 
 ## Roadmap Context
 
-**Completed (M0-M8):** Core language, runtime, GC, threads/channels, LLVM backend v1, macros, imports, collections v1, Windows support.
+**Completed (M0-M8):** Core language, runtime, GC, threads/channels, LLVM backend v2 (functions, control flow, recursion), macros, imports, collections v1, Windows support.
 
-**In Progress:** Macro stdlib (in SQALE), LLVM lowering for core subset.
+**In Progress:** Closures in LLVM backend, macro stdlib (in SQALE).
 
-**Planned:** Generics, module system, GC improvements, tooling (formatter, LSP).
+**Planned:** Generics, module system, GC improvements, tooling (formatter, LSP), LLVM optimization passes.
 
 See `ROADMAP.md` for the full checklist.
 
