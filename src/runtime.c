@@ -548,5 +548,168 @@ static int map_get_pair(Map *m, String *k, int64_t *out){ uint64_t h=hash_str(k-
 
 Value rt_map_new(Env *env, Value *args, int nargs){ (void)args; (void)nargs; VM *vm=(VM*)env->aux; Map *m=map_new_gc(vm, 16); return v_map(m);} 
 Value rt_map_set(Env *env, Value *args, int nargs){ (void)env; if (nargs!=3 || args[0].kind!=VAL_MAP || args[1].kind!=VAL_STR || args[2].kind!=VAL_INT) return v_unit(); map_set_pair(args[0].as.map, args[1].as.str, args[2].as.i); return v_unit(); }
-Value rt_map_get(Env *env, Value *args, int nargs){ (void)env; if (nargs!=2 || args[0].kind!=VAL_MAP || args[1].kind!=VAL_STR) return v_int(0); int64_t out=0; if (map_get_pair(args[0].as.map,args[1].as.str,&out)) return v_int(out); return v_int(0);} 
-Value rt_map_len(Env *env, Value *args, int nargs){ (void)env; if (nargs!=1 || args[0].kind!=VAL_MAP) return v_int(0); return v_int(args[0].as.map->len);} 
+Value rt_map_get(Env *env, Value *args, int nargs){ (void)env; if (nargs!=2 || args[0].kind!=VAL_MAP || args[1].kind!=VAL_STR) return v_int(0); int64_t out=0; if (map_get_pair(args[0].as.map,args[1].as.str,&out)) return v_int(out); return v_int(0);}
+Value rt_map_len(Env *env, Value *args, int nargs){ (void)env; if (nargs!=1 || args[0].kind!=VAL_MAP) return v_int(0); return v_int(args[0].as.map->len);}
+
+// ============================================================================
+// Option Type Operations
+// ============================================================================
+
+Value rt_some(Env *env, Value *args, int nargs) {
+  VM *vm = (VM*)env->aux;
+  if (nargs != 1) return v_none();
+  OptionVal *opt = (OptionVal*)gc_alloc(&vm->gc, sizeof(OptionVal), 10);
+  opt->value = (Value*)malloc(sizeof(Value));
+  *opt->value = args[0];
+  opt->has_value = true;
+  return v_some(opt);
+}
+
+Value rt_none_val(Env *env, Value *args, int nargs) {
+  (void)env; (void)args; (void)nargs;
+  return v_none();
+}
+
+Value rt_is_some(Env *env, Value *args, int nargs) {
+  (void)env;
+  if (nargs != 1 || args[0].kind != VAL_OPTION) return v_bool(false);
+  return v_bool(args[0].as.opt != NULL && args[0].as.opt->has_value);
+}
+
+Value rt_is_none(Env *env, Value *args, int nargs) {
+  (void)env;
+  if (nargs != 1 || args[0].kind != VAL_OPTION) return v_bool(true);
+  return v_bool(args[0].as.opt == NULL || !args[0].as.opt->has_value);
+}
+
+Value rt_unwrap(Env *env, Value *args, int nargs) {
+  (void)env;
+  if (nargs != 1) return v_unit();
+  if (args[0].kind == VAL_OPTION) {
+    if (args[0].as.opt && args[0].as.opt->has_value)
+      return *args[0].as.opt->value;
+    fprintf(stderr, "unwrap: called on None\n");
+    return v_unit();
+  }
+  if (args[0].kind == VAL_RESULT) {
+    if (args[0].as.res && args[0].as.res->is_ok)
+      return *args[0].as.res->value;
+    fprintf(stderr, "unwrap: called on Err\n");
+    return v_unit();
+  }
+  return v_unit();
+}
+
+Value rt_unwrap_or(Env *env, Value *args, int nargs) {
+  (void)env;
+  if (nargs != 2) return v_unit();
+  if (args[0].kind == VAL_OPTION) {
+    if (args[0].as.opt && args[0].as.opt->has_value)
+      return *args[0].as.opt->value;
+    return args[1]; // default value
+  }
+  if (args[0].kind == VAL_RESULT) {
+    if (args[0].as.res && args[0].as.res->is_ok)
+      return *args[0].as.res->value;
+    return args[1]; // default value
+  }
+  return args[1];
+}
+
+// ============================================================================
+// Result Type Operations
+// ============================================================================
+
+Value rt_ok_val(Env *env, Value *args, int nargs) {
+  VM *vm = (VM*)env->aux;
+  if (nargs != 1) return v_unit();
+  ResultVal *res = (ResultVal*)gc_alloc(&vm->gc, sizeof(ResultVal), 11);
+  res->value = (Value*)malloc(sizeof(Value));
+  *res->value = args[0];
+  res->is_ok = true;
+  return v_ok(res);
+}
+
+Value rt_err_val(Env *env, Value *args, int nargs) {
+  VM *vm = (VM*)env->aux;
+  if (nargs != 1) return v_unit();
+  ResultVal *res = (ResultVal*)gc_alloc(&vm->gc, sizeof(ResultVal), 11);
+  res->value = (Value*)malloc(sizeof(Value));
+  *res->value = args[0];
+  res->is_ok = false;
+  return v_err(res);
+}
+
+Value rt_is_ok(Env *env, Value *args, int nargs) {
+  (void)env;
+  if (nargs != 1 || args[0].kind != VAL_RESULT) return v_bool(false);
+  return v_bool(args[0].as.res && args[0].as.res->is_ok);
+}
+
+Value rt_is_err(Env *env, Value *args, int nargs) {
+  (void)env;
+  if (nargs != 1 || args[0].kind != VAL_RESULT) return v_bool(true);
+  return v_bool(!args[0].as.res || !args[0].as.res->is_ok);
+}
+
+Value rt_unwrap_err(Env *env, Value *args, int nargs) {
+  (void)env;
+  if (nargs != 1 || args[0].kind != VAL_RESULT) return v_unit();
+  if (args[0].as.res && !args[0].as.res->is_ok)
+    return *args[0].as.res->value;
+  fprintf(stderr, "unwrap-err: called on Ok\n");
+  return v_unit();
+}
+
+// ============================================================================
+// Struct Operations
+// ============================================================================
+
+Value rt_struct_get(Env *env, Value *args, int nargs) {
+  (void)env;
+  if (nargs != 2 || args[0].kind != VAL_STRUCT || args[1].kind != VAL_INT)
+    return v_unit();
+  StructVal *s = args[0].as.struc;
+  int64_t idx = args[1].as.i;
+  if (idx < 0 || idx >= s->nfields) return v_unit();
+  return s->fields[idx];
+}
+
+Value rt_struct_set(Env *env, Value *args, int nargs) {
+  (void)env;
+  if (nargs != 3 || args[0].kind != VAL_STRUCT || args[1].kind != VAL_INT)
+    return v_unit();
+  StructVal *s = args[0].as.struc;
+  int64_t idx = args[1].as.i;
+  if (idx < 0 || idx >= s->nfields) return v_unit();
+  s->fields[idx] = args[2];
+  return v_unit();
+}
+
+// Create a new struct instance with given name and fields
+Value rt_struct_new(Env *env, Value *args, int nargs) {
+  if (nargs < 1 || args[0].kind != VAL_STR) return v_unit();
+  const char *name = args[0].as.str->data;
+  int32_t n = (int32_t)(nargs - 1);
+
+  // Allocate struct through GC
+  VM *vm = (VM*)env->aux;
+  StructVal *s = (StructVal*)gc_alloc(&vm->gc, sizeof(StructVal), 6);
+  s->type_name = name;
+  s->nfields = n;
+  s->fields = (Value*)malloc(sizeof(Value) * n);
+  for (int32_t i = 0; i < n; i++) {
+    s->fields[i] = args[i + 1];
+  }
+  return v_struct(s);
+}
+
+// Get struct field by name
+Value rt_struct_get_field(Env *env, Value *args, int nargs) {
+  (void)env;
+  if (nargs != 2 || args[0].kind != VAL_STRUCT || args[1].kind != VAL_STR)
+    return v_unit();
+  // For named access, we'd need to store field names in StructVal
+  // For now, fall back to index-based access
+  return v_unit();
+} 

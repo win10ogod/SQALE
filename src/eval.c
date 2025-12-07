@@ -107,6 +107,25 @@ VM *vm_new(void) {
   vb = (Value*)malloc(sizeof(Value)); *vb = v_native(rt_map_set, ty_func(NULL, (Type*[]){ty_map(NULL,ty_str(NULL),t_i), ty_str(NULL), t_i},3, t_u)); env_set(vm->global_env, "map-set", vb->as.native.type, vb);
   vb = (Value*)malloc(sizeof(Value)); *vb = v_native(rt_map_get, ty_func(NULL, (Type*[]){ty_map(NULL,ty_str(NULL),t_i), ty_str(NULL)},2, t_i)); env_set(vm->global_env, "map-get", vb->as.native.type, vb);
   vb = (Value*)malloc(sizeof(Value)); *vb = v_native(rt_map_len, ty_func(NULL, (Type*[]){ty_map(NULL,ty_str(NULL),t_i)},1, t_i)); env_set(vm->global_env, "map-len", vb->as.native.type, vb);
+  // Option type operations
+  Type *t_opt = ty_option(NULL, t_any);
+  vb = (Value*)malloc(sizeof(Value)); *vb = v_native(rt_some, ty_func(NULL, (Type*[]){t_any},1, t_opt)); env_set(vm->global_env, "some", vb->as.native.type, vb);
+  vb = (Value*)malloc(sizeof(Value)); *vb = v_native(rt_none_val, ty_func(NULL, (Type*[]){},0, t_opt)); env_set(vm->global_env, "none", vb->as.native.type, vb);
+  vb = (Value*)malloc(sizeof(Value)); *vb = v_native(rt_is_some, ty_func(NULL, (Type*[]){t_opt},1, ty_bool(NULL))); env_set(vm->global_env, "some?", vb->as.native.type, vb);
+  vb = (Value*)malloc(sizeof(Value)); *vb = v_native(rt_is_none, ty_func(NULL, (Type*[]){t_opt},1, ty_bool(NULL))); env_set(vm->global_env, "none?", vb->as.native.type, vb);
+  vb = (Value*)malloc(sizeof(Value)); *vb = v_native(rt_unwrap, ty_func(NULL, (Type*[]){t_any},1, t_any)); env_set(vm->global_env, "unwrap", vb->as.native.type, vb);
+  vb = (Value*)malloc(sizeof(Value)); *vb = v_native(rt_unwrap_or, ty_func(NULL, (Type*[]){t_any,t_any},2, t_any)); env_set(vm->global_env, "unwrap-or", vb->as.native.type, vb);
+  // Result type operations
+  Type *t_res = ty_result(NULL, t_any, t_any);
+  vb = (Value*)malloc(sizeof(Value)); *vb = v_native(rt_ok_val, ty_func(NULL, (Type*[]){t_any},1, t_res)); env_set(vm->global_env, "ok", vb->as.native.type, vb);
+  vb = (Value*)malloc(sizeof(Value)); *vb = v_native(rt_err_val, ty_func(NULL, (Type*[]){t_any},1, t_res)); env_set(vm->global_env, "err", vb->as.native.type, vb);
+  vb = (Value*)malloc(sizeof(Value)); *vb = v_native(rt_is_ok, ty_func(NULL, (Type*[]){t_res},1, ty_bool(NULL))); env_set(vm->global_env, "ok?", vb->as.native.type, vb);
+  vb = (Value*)malloc(sizeof(Value)); *vb = v_native(rt_is_err, ty_func(NULL, (Type*[]){t_res},1, ty_bool(NULL))); env_set(vm->global_env, "err?", vb->as.native.type, vb);
+  vb = (Value*)malloc(sizeof(Value)); *vb = v_native(rt_unwrap_err, ty_func(NULL, (Type*[]){t_res},1, t_any)); env_set(vm->global_env, "unwrap-err", vb->as.native.type, vb);
+  // Struct operations (struct-new is variadic, first arg is name string)
+  vb = (Value*)malloc(sizeof(Value)); *vb = v_native(rt_struct_new, ty_func(NULL, (Type*[]){t_any},1, t_any)); env_set(vm->global_env, "struct-new", vb->as.native.type, vb);
+  vb = (Value*)malloc(sizeof(Value)); *vb = v_native(rt_struct_get, ty_func(NULL, (Type*[]){t_any,t_i},2, t_any)); env_set(vm->global_env, "struct-get", vb->as.native.type, vb);
+  vb = (Value*)malloc(sizeof(Value)); *vb = v_native(rt_struct_set, ty_func(NULL, (Type*[]){t_any,t_i,t_any},3, t_u)); env_set(vm->global_env, "struct-set", vb->as.native.type, vb);
   return vm;
 }
 
@@ -230,7 +249,7 @@ static Value eval_list(VM *vm, Env *env, Node *list) {
         } else {
           ex = pair->as.list.items[1];
         }
-        Value v = eval_node(vm, env, ex);
+        Value v = eval_node(vm, child, ex);  // Use child env so previous bindings are visible
         Value *box = (Value*)malloc(sizeof(Value)); *box=v;
         env_set(child, nm->as.sym.ptr, ex->ty, box);
       }
@@ -283,6 +302,52 @@ static Value eval_list(VM *vm, Env *env, Node *list) {
       if (len >= sizeof(tmp)) len = sizeof(tmp)-1;
       memcpy(tmp, list->as.list.items[1]->as.str.ptr, len); tmp[len]='\0';
       (void)vm_import_resolve_and_load(vm, tmp);
+      return v_unit();
+    }
+    // defstruct: [defstruct Name [[field1 : Type1] [field2 : Type2] ...]]
+    if (is_sym(head, "defstruct")) {
+      if (n < 3 || list->as.list.items[1]->kind != N_SYMBOL) return v_unit();
+      const char *name = list->as.list.items[1]->as.sym.ptr;
+      Node *fields_node = list->as.list.items[2];
+      size_t nfields = fields_node->as.list.count;
+
+      // Store type definition in environment
+      Type **field_types = (Type**)malloc(sizeof(Type*) * nfields);
+      const char **field_names = (const char**)malloc(sizeof(const char*) * nfields);
+      for (size_t i = 0; i < nfields; i++) {
+        Node *f = fields_node->as.list.items[i];
+        field_names[i] = f->as.list.items[0]->as.sym.ptr;
+        field_types[i] = (f->as.list.count >= 3) ? parse_type_node(f->as.list.items[2]) : ty_any(NULL);
+      }
+      Type *struct_ty = ty_struct(NULL, name, field_types, field_names, nfields);
+
+      // Create constructor function that creates struct instances
+      // Store type definition in env for lookup
+      env_set(env, name, struct_ty, NULL);
+      return v_unit();
+    }
+    // defenum: [defenum Name [Variant1 Variant2 ...]]
+    if (is_sym(head, "defenum")) {
+      if (n < 3 || list->as.list.items[1]->kind != N_SYMBOL) return v_unit();
+      const char *name = list->as.list.items[1]->as.sym.ptr;
+      Node *variants_node = list->as.list.items[2];
+      size_t nvariants = variants_node->as.list.count;
+
+      const char **variants = (const char**)malloc(sizeof(const char*) * nvariants);
+      for (size_t i = 0; i < nvariants; i++) {
+        variants[i] = variants_node->as.list.items[i]->as.sym.ptr;
+      }
+      Type *enum_ty = ty_enum(NULL, name, variants, nvariants);
+
+      // Register enum type and variant constructors
+      env_set(env, name, enum_ty, NULL);
+
+      // Register each variant as a value
+      for (size_t i = 0; i < nvariants; i++) {
+        Value *vb = (Value*)malloc(sizeof(Value));
+        *vb = v_int((int64_t)i); // Each variant is an integer tag
+        env_set(env, variants[i], ty_int(NULL), vb);
+      }
       return v_unit();
     }
     if (is_sym(head, "fn")) {
@@ -515,6 +580,46 @@ static int typecheck_list(Env *tenv, Node *list) {
       // variadic; element types may differ; return Vec Any
       for (size_t i=1;i<list->as.list.count;i++) if (!typecheck_node(tenv, list->as.list.items[i])) return 0;
       list->ty = ty_vec(NULL, ty_any(NULL)); return 1;
+    }
+    // struct-new: variadic, first arg is type name string, rest are field values
+    if (is_sym(head, "struct-new")) {
+      for (size_t i=1;i<list->as.list.count;i++) if (!typecheck_node(tenv, list->as.list.items[i])) return 0;
+      list->ty = ty_any(NULL); return 1;
+    }
+    // defstruct: [defstruct Name [[field1 : Type1] ...]]
+    if (is_sym(head, "defstruct")) {
+      if (list->as.list.count < 3 || list->as.list.items[1]->kind != N_SYMBOL) return 0;
+      const char *name = list->as.list.items[1]->as.sym.ptr;
+      Node *fields_node = list->as.list.items[2];
+      size_t nfields = fields_node->as.list.count;
+      Type **field_types = (Type**)malloc(sizeof(Type*) * nfields);
+      const char **field_names = (const char**)malloc(sizeof(const char*) * nfields);
+      for (size_t i = 0; i < nfields; i++) {
+        Node *f = fields_node->as.list.items[i];
+        field_names[i] = f->as.list.items[0]->as.sym.ptr;
+        field_types[i] = (f->as.list.count >= 3) ? parse_type_node(f->as.list.items[2]) : ty_any(NULL);
+      }
+      Type *struct_ty = ty_struct(NULL, name, field_types, field_names, nfields);
+      env_set(tenv, name, struct_ty, NULL);
+      list->ty = ty_unit(NULL); return 1;
+    }
+    // defenum: [defenum Name [Variant1 Variant2 ...]]
+    if (is_sym(head, "defenum")) {
+      if (list->as.list.count < 3 || list->as.list.items[1]->kind != N_SYMBOL) return 0;
+      const char *name = list->as.list.items[1]->as.sym.ptr;
+      Node *variants_node = list->as.list.items[2];
+      size_t nvariants = variants_node->as.list.count;
+      const char **variants = (const char**)malloc(sizeof(const char*) * nvariants);
+      for (size_t i = 0; i < nvariants; i++) {
+        variants[i] = variants_node->as.list.items[i]->as.sym.ptr;
+      }
+      Type *enum_ty = ty_enum(NULL, name, variants, nvariants);
+      env_set(tenv, name, enum_ty, NULL);
+      // Register each variant as an Int
+      for (size_t i = 0; i < nvariants; i++) {
+        env_set(tenv, variants[i], ty_int(NULL), NULL);
+      }
+      list->ty = ty_unit(NULL); return 1;
     }
   }
   // Call typechecking: head must have function type in env

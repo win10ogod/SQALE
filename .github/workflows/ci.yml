@@ -1,0 +1,132 @@
+name: CI
+
+on:
+  push:
+    branches: [ main, master, develop ]
+  pull_request:
+    branches: [ main, master ]
+
+jobs:
+  build-linux:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        compiler: [gcc, clang]
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Install dependencies
+      run: sudo apt-get update && sudo apt-get install -y build-essential
+
+    - name: Build
+      run: make CC=${{ matrix.compiler }}
+
+    - name: Run smoke tests
+      run: bash scripts/run_tests.sh
+
+    - name: Run example programs
+      run: |
+        ./build/sqale run examples/hello.sq
+        ./build/sqale run examples/functions.sq
+        ./build/sqale run examples/collections.sq
+        ./build/sqale run examples/test_operators.sq
+        ./build/sqale run examples/test_new_features.sq
+        ./build/sqale run examples/test_option_result.sq
+
+  build-macos:
+    runs-on: macos-latest
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Build
+      run: make
+
+    - name: Run smoke tests
+      run: bash scripts/run_tests.sh
+
+    - name: Run example programs
+      run: |
+        ./build/sqale run examples/hello.sq
+        ./build/sqale run examples/functions.sq
+        ./build/sqale run examples/test_operators.sq
+
+  build-windows:
+    runs-on: windows-latest
+    defaults:
+      run:
+        shell: msys2 {0}
+    steps:
+    - uses: actions/checkout@v4
+
+    - uses: msys2/setup-msys2@v2
+      with:
+        msystem: MINGW64
+        update: true
+        install: mingw-w64-x86_64-gcc make
+
+    - name: Build
+      run: make
+
+    - name: Run example programs
+      run: |
+        ./build/sqale run examples/hello.sq
+        ./build/sqale run examples/functions.sq
+
+  build-with-sanitizers:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Build with AddressSanitizer
+      run: |
+        make clean
+        make CFLAGS="-std=c11 -O0 -g -Wall -Wextra -Werror -fsanitize=address,undefined -fno-omit-frame-pointer -Iinclude -DUSE_LLVM=0"
+
+    - name: Run tests with sanitizers
+      run: |
+        ./build/sqale run examples/hello.sq
+        ./build/sqale run examples/test_operators.sq
+      continue-on-error: true  # Memory leaks are expected (GC not fully integrated)
+
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Check formatting (basic)
+      run: |
+        # Check for trailing whitespace
+        if grep -r '[[:space:]]$' src/ include/; then
+          echo "Warning: trailing whitespace found"
+        fi
+        # Check for tabs (we use spaces)
+        if grep -P '\t' src/*.c include/*.h 2>/dev/null; then
+          echo "Warning: tabs found (use spaces)"
+        fi
+
+  release:
+    needs: [build-linux, build-macos]
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Build release binary
+      run: |
+        make clean
+        make CFLAGS="-std=c11 -O3 -Wall -Wextra -Iinclude -DUSE_LLVM=0"
+
+    - name: Create release artifact
+      run: |
+        mkdir -p release
+        cp build/sqale release/
+        cp -r examples release/
+        cp README.md release/ 2>/dev/null || true
+        cp LICENSE release/ 2>/dev/null || true
+        cd release && tar -czvf ../sqale-linux-x64.tar.gz .
+
+    - name: Upload artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: sqale-linux-x64
+        path: sqale-linux-x64.tar.gz

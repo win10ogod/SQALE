@@ -118,6 +118,26 @@ Value rt_map_set(Env *env, Value *args, int nargs);
 Value rt_map_get(Env *env, Value *args, int nargs);
 Value rt_map_len(Env *env, Value *args, int nargs);
 
+// Option type operations
+Value rt_some(Env *env, Value *args, int nargs);
+Value rt_none_val(Env *env, Value *args, int nargs);
+Value rt_is_some(Env *env, Value *args, int nargs);
+Value rt_is_none(Env *env, Value *args, int nargs);
+Value rt_unwrap(Env *env, Value *args, int nargs);
+Value rt_unwrap_or(Env *env, Value *args, int nargs);
+
+// Result type operations
+Value rt_ok_val(Env *env, Value *args, int nargs);
+Value rt_err_val(Env *env, Value *args, int nargs);
+Value rt_is_ok(Env *env, Value *args, int nargs);
+Value rt_is_err(Env *env, Value *args, int nargs);
+Value rt_unwrap_err(Env *env, Value *args, int nargs);
+
+// Struct operations
+Value rt_struct_new(Env *env, Value *args, int nargs);
+Value rt_struct_get(Env *env, Value *args, int nargs);
+Value rt_struct_set(Env *env, Value *args, int nargs);
+
 // ============================================================================
 // LLVM Runtime Interface
 // These functions are called from LLVM-generated code
